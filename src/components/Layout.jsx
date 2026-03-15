@@ -3,8 +3,8 @@ import { useInventory } from '../context/InventoryContext'
 const TABS = [
   { id: 'home', label: 'Inicio', icon: '📋' },
   { id: 'count', label: 'Conteo', icon: '🔢' },
-  { id: 'correction', label: 'Corrección', icon: '🔧' },
-  { id: 'comparison', label: 'Comparación', icon: '📊' },
+  { id: 'correction', label: 'Corrección', icon: '🔧', disabled: true },
+  { id: 'comparison', label: 'Comparación', icon: '📊', disabled: true },
   { id: 'settings', label: 'Ajustes', icon: '⚙️' },
 ]
 
@@ -40,13 +40,16 @@ export default function Layout({ activePage, onNavigate, children }) {
               key={tab.id}
               onClick={() => onNavigate(tab.id)}
               className={`flex items-center gap-3 px-4 py-3 text-left text-sm font-medium transition-colors ${
-                activePage === tab.id
-                  ? 'bg-blue-600/20 text-blue-400 border-r-2 border-blue-400'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                tab.disabled
+                  ? 'text-gray-600 cursor-default'
+                  : activePage === tab.id
+                    ? 'bg-blue-600/20 text-blue-400 border-r-2 border-blue-400'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
               }`}
             >
               <span>{tab.icon}</span>
               <span>{tab.label}</span>
+              {tab.disabled && <span className="text-[10px] text-gray-600 ml-auto">Pronto</span>}
             </button>
           ))}
         </nav>
@@ -64,7 +67,9 @@ export default function Layout({ activePage, onNavigate, children }) {
             key={tab.id}
             onClick={() => onNavigate(tab.id)}
             className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-xs transition-colors ${
-              activePage === tab.id ? 'text-blue-400' : 'text-gray-500'
+              tab.disabled
+                ? 'text-gray-700'
+                : activePage === tab.id ? 'text-blue-400' : 'text-gray-500'
             }`}
           >
             <span className="text-lg">{tab.icon}</span>
