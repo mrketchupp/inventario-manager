@@ -139,7 +139,7 @@ export default function PhysicalCount() {
               view === 'labels' ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
             }`}
           >
-            🏷 Etiquetas {labeledMaterials.length > 0 && `(${labeledMaterials.length})`}
+            🔔 Recordatorios {labeledMaterials.length > 0 && `(${labeledMaterials.length})`}
           </button>
           <button
             onClick={() => setView(view === 'add' ? 'card' : 'add')}
@@ -171,9 +171,9 @@ export default function PhysicalCount() {
       {/* Labels view */}
       {view === 'labels' && (
         <div className="space-y-3">
-          <h3 className="text-lg font-semibold text-white">Materiales con Etiquetas</h3>
+          <h3 className="text-lg font-semibold text-white">Materiales con Recordatorios</h3>
           {labeledMaterials.length === 0 ? (
-            <p className="text-gray-500 text-sm">No hay materiales etiquetados</p>
+            <p className="text-gray-500 text-sm">No hay materiales con recordatorios</p>
           ) : (
             <SortableTable
               columns={[
@@ -182,7 +182,7 @@ export default function PhysicalCount() {
                 { key: 'tamano', label: 'Tamaño' },
                 { key: 'color', label: 'Color' },
                 { key: 'container', label: 'Cont.' },
-                { key: 'labels', label: 'Etiquetas', render: (_, row) => {
+                { key: 'labels', label: 'Recordatorios', render: (_, row) => {
                   const r = reviews[String(row.id)]
                   return (r?.labels || []).map(l => (
                     <span key={l} className="inline-block bg-yellow-600/30 text-yellow-300 px-2 py-0.5 rounded text-xs mr-1">{l}</span>
