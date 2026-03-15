@@ -28,7 +28,7 @@ export function exportPhysicalInventory(materials, reviews = {}, filename) {
     if (!items || items.length === 0) continue
 
     const rows = items.map((m, idx) => {
-      const review = reviews[`${m.codigoAx}|${m.tamano}|${m.color}`] || {}
+      const review = reviews[String(m.id)] || {}
       const cantidad = review.newQty !== undefined ? review.newQty : m.cantidad
       return {
         'ITEM': idx + 1,

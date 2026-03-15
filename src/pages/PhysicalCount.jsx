@@ -4,7 +4,6 @@ import ContainerSelector from '../components/ContainerSelector'
 import ProgressBar from '../components/ProgressBar'
 import SortableTable from '../components/SortableTable'
 import { searchMaterials } from '../utils/search'
-import { materialKey } from '../utils/normalize'
 import { exportPhysicalInventory } from '../utils/excelExporter'
 
 const LABELS = ['Falta etiquetar', 'Corregir etiqueta']
@@ -37,7 +36,7 @@ export default function PhysicalCount() {
   }, [physicalInventory, currentContainer, currentType, searchQuery])
 
   const current = filtered[currentIndex] || null
-  const currentKey = current ? materialKey(current) : null
+  const currentKey = current ? String(current.id) : null
   const review = currentKey ? reviews[currentKey] : null
 
   useEffect(() => {
@@ -54,14 +53,14 @@ export default function PhysicalCount() {
 
   const reviewedCount = useMemo(() => {
     return filtered.filter(m => {
-      const r = reviews[materialKey(m)]
+      const r = reviews[String(m.id)]
       return r && (r.status === 'confirmed' || r.status === 'modified')
     }).length
   }, [filtered, reviews])
 
   const labeledMaterials = useMemo(() => {
     return physicalInventory.filter(m => {
-      const r = reviews[materialKey(m)]
+      const r = reviews[String(m.id)]
       return r?.labels?.length > 0
     })
   }, [physicalInventory, reviews])
@@ -184,13 +183,13 @@ export default function PhysicalCount() {
                 { key: 'color', label: 'Color' },
                 { key: 'container', label: 'Cont.' },
                 { key: 'labels', label: 'Etiquetas', render: (_, row) => {
-                  const r = reviews[materialKey(row)]
+                  const r = reviews[String(row.id)]
                   return (r?.labels || []).map(l => (
                     <span key={l} className="inline-block bg-yellow-600/30 text-yellow-300 px-2 py-0.5 rounded text-xs mr-1">{l}</span>
                   ))
                 }},
               ]}
-              data={labeledMaterials.map(m => ({ ...m, _key: materialKey(m) }))}
+              data={labeledMaterials.map(m => ({ ...m, _key: String(m.id) }))}
             />
           )}
         </div>

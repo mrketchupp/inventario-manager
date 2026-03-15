@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useInventory } from '../context/InventoryContext'
 
 const TABS = [
@@ -11,23 +10,12 @@ const TABS = [
 
 export default function Layout({ activePage, onNavigate, children }) {
   const { undo, canUndo } = useInventory()
-  const [menuOpen, setMenuOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
       {/* Header */}
       <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <button
-            className="md:hidden text-gray-400 hover:text-white p-1"
-            onClick={() => setMenuOpen(!menuOpen)}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <h1 className="text-lg font-bold text-white">Inventario Pozo</h1>
-        </div>
+        <h1 className="text-lg font-bold text-white">Inventario Pozo</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={undo}
@@ -45,7 +33,7 @@ export default function Layout({ activePage, onNavigate, children }) {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar - desktop */}
+        {/* Sidebar - desktop only */}
         <nav className="hidden md:flex flex-col w-48 bg-gray-900 border-r border-gray-800 shrink-0">
           {TABS.map(tab => (
             <button
@@ -63,40 +51,14 @@ export default function Layout({ activePage, onNavigate, children }) {
           ))}
         </nav>
 
-        {/* Mobile menu overlay */}
-        {menuOpen && (
-          <div className="fixed inset-0 z-50 md:hidden" onClick={() => setMenuOpen(false)}>
-            <div className="absolute inset-0 bg-black/50" />
-            <nav className="absolute left-0 top-0 bottom-0 w-56 bg-gray-900 shadow-xl" onClick={e => e.stopPropagation()}>
-              <div className="p-4 border-b border-gray-800">
-                <h2 className="text-white font-bold">Navegación</h2>
-              </div>
-              {TABS.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => { onNavigate(tab.id); setMenuOpen(false) }}
-                  className={`flex items-center gap-3 w-full px-4 py-3 text-left text-sm font-medium transition-colors ${
-                    activePage === tab.id
-                      ? 'bg-blue-600/20 text-blue-400'
-                      : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                  }`}
-                >
-                  <span>{tab.icon}</span>
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-            </nav>
-          </div>
-        )}
-
         {/* Main content */}
-        <main className="flex-1 overflow-auto p-4 md:p-6">
+        <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
           {children}
         </main>
       </div>
 
-      {/* Bottom nav - mobile */}
-      <nav className="md:hidden flex bg-gray-900 border-t border-gray-800 shrink-0">
+      {/* Bottom nav - mobile, fixed at bottom */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex bg-gray-900 border-t border-gray-800">
         {TABS.map(tab => (
           <button
             key={tab.id}
