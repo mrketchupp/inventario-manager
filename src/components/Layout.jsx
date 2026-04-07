@@ -3,8 +3,8 @@ import { useInventory } from '../context/InventoryContext'
 const TABS = [
   { id: 'home', label: 'Inicio', icon: '📋' },
   { id: 'count', label: 'Conteo', icon: '🔢' },
-  { id: 'correction', label: 'Corrección', icon: '🔧', disabled: true },
-  { id: 'comparison', label: 'Comparación', icon: '📊', disabled: true },
+  { id: 'correction', label: 'Corrección', icon: '🔧' },
+  { id: 'comparison', label: 'Comparación', icon: '📊' },
   { id: 'settings', label: 'Ajustes', icon: '⚙️' },
 ]
 
