@@ -5,15 +5,29 @@ La página principal del sitio es **`index.html`**, una aplicación web autónom
 
 ## Uso
 
-Abre `index.html` directamente en el navegador, o sírvelo como sitio estático.
-No requiere instalación ni build: las dependencias (XLSX y las fuentes) se
-cargan desde CDN.
+Sírvelo como sitio estático (la app usa un service worker, que requiere
+`http(s)://`, no `file://`). No requiere instalación ni build.
 
 ```bash
 # Ejemplo: servirlo localmente
 python3 -m http.server
 # luego abre http://localhost:8000
 ```
+
+## Offline / añadir a la pantalla de inicio (iOS)
+
+Todas las dependencias están alojadas localmente (no se usa ningún CDN):
+
+- `assets/xlsx.full.min.js` — librería SheetJS/XLSX.
+- `assets/fonts.css` + `assets/fonts/*.woff2` — fuentes Oswald e IBM Plex
+  (subset latin) self-hosted.
+
+Un service worker (`sw.js`) precachea la app y estos recursos en la primera
+visita, de modo que funciona **sin conexión**. Al añadirla a la pantalla de
+inicio desde Safari en iOS, abre y opera offline.
+
+> Si actualizas algún recurso, sube `CACHE_VERSION` en `sw.js` para forzar que
+> los dispositivos descarguen la nueva versión.
 
 ## Código anterior
 
