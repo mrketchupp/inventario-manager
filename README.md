@@ -1,16 +1,22 @@
-# React + Vite
+# Conteo Físico · Inventario DLTA
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+La página principal del sitio es **`index.html`**, una aplicación web autónoma
+(de un solo archivo) para el conteo físico de inventario.
 
-Currently, two official plugins are available:
+## Uso
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Abre `index.html` directamente en el navegador, o sírvelo como sitio estático.
+No requiere instalación ni build: las dependencias (XLSX y las fuentes) se
+cargan desde CDN.
 
-## React Compiler
+```bash
+# Ejemplo: servirlo localmente
+python3 -m http.server
+# luego abre http://localhost:8000
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Código anterior
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+El proyecto previo en React + Vite se conserva en la carpeta
+[`miselanio/`](./miselanio) por referencia. Consulta su propio README para
+instrucciones de desarrollo.
