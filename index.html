@@ -346,6 +346,83 @@ const norm = s => (s==null?"":String(s)).trim().toUpperCase().normalize("NFD")
 let STATE={ buf:null, fname:"", sheets:[], active:0, filter:"all", q:"", onlyDif:false,
             view:"card", cardIdx:0, cardEditing:false, tableEditable:false, focus:false };
 
+/* ---------- persistencia (IndexedDB) ----------
+   El conteo se guarda automáticamente para que sobreviva a recargas (iOS
+   recarga la app al pasar a segundo plano). El archivo (buf+estructura) se
+   guarda una vez al cargar; el progreso editable se guarda con debounce y al
+   ocultar la página. */
+const DB_NAME="conteoDLTA", DB_STORE="kv", SNAP_FILE="file", SNAP_PROG="progress";
+let _dbp=null;
+function db(){
+  if(_dbp) return _dbp;
+  _dbp=new Promise((res,rej)=>{
+    let rq; try{ rq=indexedDB.open(DB_NAME,1); }catch(e){ rej(e); return; }
+    rq.onupgradeneeded=()=>{ const d=rq.result; if(!d.objectStoreNames.contains(DB_STORE)) d.createObjectStore(DB_STORE); };
+    rq.onsuccess=()=>res(rq.result);
+    rq.onerror=()=>rej(rq.error);
+  });
+  return _dbp;
+}
+function idbSet(key,val){ return db().then(d=>new Promise((res,rej)=>{
+  const tx=d.transaction(DB_STORE,"readwrite"); tx.objectStore(DB_STORE).put(val,key);
+  tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); })); }
+function idbGet(key){ return db().then(d=>new Promise((res,rej)=>{
+  const tx=d.transaction(DB_STORE,"readonly"); const rq=tx.objectStore(DB_STORE).get(key);
+  rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); })); }
+function idbDel(key){ return db().then(d=>new Promise((res,rej)=>{
+  const tx=d.transaction(DB_STORE,"readwrite"); tx.objectStore(DB_STORE).delete(key);
+  tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); })); }
+
+function saveFile(){
+  if(!STATE.buf) return Promise.resolve();
+  return idbSet(SNAP_FILE,{ v:1, fname:STATE.fname, buf:STATE.buf,
+      sheets:STATE.sheets.map(s=>({name:s.name,col:s.col,rows:s.rows})) })
+    .then(()=>saveProgress())
+    .catch(e=>console.warn("No se pudo guardar el archivo",e));
+}
+function saveProgress(){
+  if(!STATE.buf) return Promise.resolve();
+  clearTimeout(_saveT);
+  return idbSet(SNAP_PROG,{ v:1,
+      ui:{active:STATE.active,filter:STATE.filter,q:STATE.q,onlyDif:STATE.onlyDif,view:STATE.view,cardIdx:STATE.cardIdx},
+      sheets:STATE.sheets.map(s=>s.rows.map(r=>[r.dim,r.np,r.qty,r.confirmed?1:0])) })
+    .catch(e=>console.warn("No se pudo guardar el progreso",e));
+}
+let _saveT=null;
+function scheduleSave(){ if(!STATE.buf) return; clearTimeout(_saveT); _saveT=setTimeout(saveProgress,500); }
+function clearSaved(){ return Promise.all([idbDel(SNAP_FILE),idbDel(SNAP_PROG)]).catch(()=>{}); }
+
+function restoreSession(){
+  return idbGet(SNAP_FILE).then(file=>{
+    if(!file||!file.buf||!file.sheets||!file.sheets.length) return false;
+    STATE.buf=file.buf; STATE.fname=file.fname||"";
+    STATE.sheets=file.sheets.map(s=>({name:s.name,col:s.col,rows:s.rows.map(r=>Object.assign({},r))}));
+    return idbGet(SNAP_PROG).catch(()=>null).then(prog=>{
+      if(prog&&prog.sheets){
+        prog.sheets.forEach((rowsP,si)=>{ const s=STATE.sheets[si]; if(!s) return;
+          rowsP.forEach((p,ri)=>{ const row=s.rows[ri]; if(!row) return;
+            row.dim=p[0]; row.np=p[1]; row.qty=p[2]; row.confirmed=!!p[3]; }); });
+        const u=prog.ui||{};
+        STATE.active=Math.min(Math.max(0,u.active|0),STATE.sheets.length-1);
+        STATE.filter=u.filter||"all"; STATE.q=u.q||""; STATE.onlyDif=!!u.onlyDif;
+        STATE.view=u.view||(window.innerWidth<760?"card":"table"); STATE.cardIdx=Math.max(0,u.cardIdx|0);
+      } else {
+        STATE.view=window.innerWidth<760?"card":"table";
+      }
+      $("#search").value=STATE.q; $("#onlyDif").checked=STATE.onlyDif;
+      $("#estadoFilter").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.f===STATE.filter));
+      bootUI();
+      let n=0; STATE.sheets.forEach(s=>s.rows.forEach(r=>{ if(changed(r)||r.confirmed) n++; }));
+      toast("Sesión restaurada"+(n?" · "+n+" ítems con avance":""),"ok");
+      return true;
+    });
+  }).catch(e=>{ console.warn("No se pudo restaurar la sesión",e); return false; });
+}
+
+/* Guardado inmediato al ocultar/cerrar la página (clave en iOS). */
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden") saveProgress(); });
+window.addEventListener("pagehide",()=>{ saveProgress(); });
+
 /* ---------- load ---------- */
 $("#loadBtn").onclick=$("#dropBtn").onclick=()=>$("#fileInput").click();
 $("#fileInput").onchange=e=>{ if(e.target.files[0]) readFile(e.target.files[0]); };
@@ -367,6 +444,7 @@ function readFile(file){
     $("#search").value=""; $("#onlyDif").checked=false;
     $("#estadoFilter").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.f==="all"));
     bootUI();
+    saveFile();
     toast("Cargado: "+sheets.length+" contenedores · "+totalRows()+" ítems","ok");
   }catch(err){console.error(err);toast("Error al leer: "+err.message,"err");} };
   r.onerror=()=>toast("No se pudo leer el archivo","err");
@@ -609,6 +687,7 @@ function updateStats(){
   $("#s-corr").textContent=corr;$("#s-dif").textContent=dif;
   $("#pbar").style.width=tot?(100*(ok+corr)/tot)+"%":"0%";
   if(document.body.classList.contains("focus")) updateFocusBar();
+  scheduleSave();
 }
 
 /* ---------- controls ---------- */
@@ -647,6 +726,7 @@ document.addEventListener("fullscreenchange",()=>{ if(!document.fullscreenElemen
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&STATE.focus) exitFocus(); });
 $("#resetBtn").onclick=()=>{ if(!confirm("¿Descartar todos los conteos no exportados?"))return;
   exitFocus();
+  clearTimeout(_saveT); clearSaved();
   STATE={buf:null,fname:"",sheets:[],active:0,filter:"all",q:"",onlyDif:false,view:"card",cardIdx:0,cardEditing:false,tableEditable:false,focus:false};
   $("#app").classList.add("hidden");$("#empty").classList.remove("hidden");
   $("#exportBtn").classList.add("hidden");$("#resetBtn").classList.add("hidden");
@@ -696,6 +776,9 @@ function setFormula(ws,a,f,c){ws[a]={t:"n",f:f,v:c};}
 let toastT;
 function toast(m,k){const t=$("#toast");t.textContent=m;t.className="toast show "+(k||"");
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),2400);}
+
+/* ---------- init: restaurar sesión previa ---------- */
+restoreSession();
 </script>
 </body>
 </html>
