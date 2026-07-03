@@ -331,7 +331,8 @@
     El progreso se guarda automáticamente en este dispositivo y sobrevive a recargas.
     <b>Exporta a Excel para respaldar o compartir.</b>
     La exportación conserva todas las columnas, recalcula <code>TOTAL</code>, añade los ítems nuevos
-    y movidos a su contenedor, y registra todo (incl. etiquetas) en la hoja <code>CAMBIOS</code>.
+    y movidos a su contenedor (quitándolos del origen), y registra los cambios en la hoja <code>CAMBIOS</code>.
+    Las marcas de etiqueta 🏷 se consultan aquí en el sitio, no se exportan.
   </div>
 </div>
 
@@ -961,17 +962,10 @@ function exportXlsx(){ try{
         if(row.isNew){ add("NUEVO","","conteo: "+fmt(row.qty)); }
         else{
           add("MOVIDO",row.oSheet.replace(/\s+/g," ").trim(),s.name.replace(/\s+/g," ").trim());
-          /* En el contenedor de origen ya no está: su conteo queda en 0. */
-          const oc=colOf[row.oSheet], ows=wb.Sheets[row.oSheet];
-          if(oc&&ows&&oc.QTY!==undefined&&row.r>=0){
-            const oR=row.r+1, oL=k=>oc[k]===undefined?null:XLSX.utils.encode_col(oc[k]);
-            setNum(ows,oL("QTY")+oR,0);
-            if(oc.TOT!==undefined){
-              let f=(oc.ING!==undefined?oL("ING")+oR+"+":"")+oL("QTY")+oR;
-              if(oc.CONS!==undefined) f+="-"+oL("CONS")+oR;
-              setFormula(ows,oL("TOT")+oR,f,(Number(row.ingreso)||0)-(Number(row.consumo)||0));
-            }
-          }
+          /* En el contenedor de origen ya no está: se elimina su fila
+             (celdas vaciadas y fila oculta, sin desplazar el resto). */
+          const ows=wb.Sheets[row.oSheet];
+          if(ows&&ows["!ref"]&&row.r>=0) removeSheetRow(ows,row.r);
           if(Number(row.qty)!==Number(row.oQty)) add("CANTIDAD",row.oQty,row.qty);
         }
         if(row.dim!==row.oDim&&!row.isNew) add("DIMENSION",row.oDim,row.dim);
@@ -992,7 +986,7 @@ function exportXlsx(){ try{
         if(Number(row.qty)!==Number(row.oQty)) add("CANTIDAD",row.oQty,row.qty);
         if(st!=="corregido"&&row.confirmed) add("(validado)","","");
       }
-      if(row.tag) add("ETIQUETA","",TAG_TIPOS[row.tag.tipo]+(row.tag.nota?" · "+row.tag.nota:""));
+      /* Las marcas de etiqueta se consultan en el sitio; no se exportan. */
     });
   });
   const wsLog=XLSX.utils.aoa_to_sheet(log);
@@ -1007,6 +1001,15 @@ function exportXlsx(){ try{
 function setText(ws,a,v){ws[a]={t:"s",v:String(v),w:String(v)};}
 function setNum(ws,a,v){ws[a]={t:"n",v:Number(v)};}
 function setFormula(ws,a,f,c){ws[a]={t:"n",f:f,v:c};}
+/* Elimina una fila de la hoja: vacía sus celdas y la marca oculta.
+   No desplaza las filas siguientes, para no romper fórmulas ni estilos. */
+function removeSheetRow(ws,r0){
+  const range=XLSX.utils.decode_range(ws["!ref"]);
+  if(r0<range.s.r||r0>range.e.r) return;
+  for(let c=range.s.c;c<=range.e.c;c++) delete ws[XLSX.utils.encode_cell({r:r0,c:c})];
+  if(!ws["!rows"]) ws["!rows"]=[];
+  ws["!rows"][r0]=Object.assign(ws["!rows"][r0]||{},{hidden:true});
+}
 /* Añade una fila (ítem nuevo/movido) al final de la hoja, extendiendo su rango. */
 function appendRowToSheet(ws,col,row){
   if(!ws["!ref"]) return;
