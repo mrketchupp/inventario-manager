@@ -23,6 +23,22 @@ y al ocultar/cerrar la página. Al reabrir, la sesión se restaura automáticame
 en el mismo contenedor y vista. El botón de **descartar** (reset) borra también
 lo guardado.
 
+## Vista Lista (tipo Notion)
+
+Además de la vista Tarjeta, la vista **Lista** muestra cada ítem compacto
+(código AX · dimensión · cantidad) y se expande al tocarlo para editar
+descripción, NP, UM, dimensión y conteo. Desde el panel expandido se puede:
+
+- **Reordenar** ítems (arrastrando el asa `⠿` o con los botones ↑/↓).
+- **Añadir ítems nuevos** (botón `➕ Ítem`); al exportar se añaden al final de
+  la hoja de su contenedor y quedan registrados como `NUEVO` en `CAMBIOS`.
+- **Mover ítems a otro contenedor**; al exportar, el conteo del origen queda
+  en 0 y el ítem se añade a la hoja del contenedor destino (registrado como
+  `MOVIDO`).
+- **Marcar corrección de etiqueta** 🏷 (modificar etiqueta / falta etiquetar /
+  cantidad de etiquetas, con nota). Tiene su propio filtro y contador, y se
+  exporta como `ETIQUETA` en `CAMBIOS`.
+
 ## Offline / añadir a la pantalla de inicio (iOS)
 
 Todas las dependencias están alojadas localmente (no se usa ningún CDN):

@@ -70,6 +70,7 @@
   .stat .l{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-top:4px}
   .stat.pend .n{color:var(--faint)} .stat.ok .n{color:var(--green)}
   .stat.corr .n{color:var(--amber)} .stat.dif .n{color:var(--red)}
+  .stat.tag .n{color:var(--blue)}
   .progress-wrap{padding:12px 16px 8px}
   .pbar{height:5px;background:var(--surface);border-radius:3px;overflow:hidden;margin-top:10px}
   .pbar>i{display:block;height:100%;background:linear-gradient(90deg,var(--green),#6fdc8c);width:0;transition:width .3s}
@@ -93,8 +94,7 @@
   /* ================= CARD VIEW ================= */
   #cardView{display:none;padding:14px 16px 90px;max-width:560px;margin:0 auto}
   body.view-card #cardView{display:block}
-  body.view-card #tableWrap{display:none}
-  body.view-card #tableLock{display:none}
+  body.view-card #listWrap{display:none}
 
   .cardnav{display:flex;align-items:center;gap:10px;margin-bottom:14px}
   .cardnav .pos{flex:1;text-align:center;font-family:var(--mono);font-size:14px;color:var(--muted)}
@@ -141,6 +141,8 @@
   .btn-edit.editing{background:var(--amber);color:#0d1117;border-color:var(--amber);font-weight:600}
   .btn-val{color:var(--green)}
   .btn-val.on{background:var(--green);color:#0d1117;border-color:var(--green);font-weight:600}
+  .card-actions .btn-tagc{flex:0 0 60px;color:var(--blue)}
+  .card-actions .btn-tagc.on{background:var(--blue);color:#0d1117;border-color:var(--blue);font-weight:600}
 
   .badge{font-family:var(--disp);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;
     padding:3px 9px;border-radius:20px;border:1px solid}
@@ -148,36 +150,55 @@
   .b-ok{color:var(--green);border-color:#1d4427;background:var(--green-dim)}
   .b-corr{color:var(--amber);border-color:#4a3c12;background:var(--amber-dim)}
 
-  /* ================= TABLE VIEW ================= */
-  #tableWrap{display:none;padding:0 16px 80px}
-  body.view-table #tableWrap{display:block}
-  #tableLock{display:none}
-  body.view-table #tableLock{display:inline-flex}
-  table{border-collapse:separate;border-spacing:0;width:100%;margin-top:14px}
-  thead th{position:sticky;top:0;z-index:10;background:#10151c;font-family:var(--disp);font-weight:500;
-    font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);text-align:left;
-    padding:9px 10px;border-bottom:2px solid var(--border2);white-space:nowrap}
-  thead th.num{text-align:right}
-  tbody td{padding:5px 10px;border-bottom:1px solid var(--border);vertical-align:middle;font-size:13px}
-  tbody tr:hover{background:#141a22}
-  tr.corr{background:rgba(255,176,0,.045)} tr.ok{background:rgba(63,185,80,.04)}
-  .c-item{font-family:var(--mono);color:var(--faint);font-size:12px;text-align:right;width:42px}
-  .c-cod{font-family:var(--mono);color:var(--blue);font-size:12.5px;white-space:nowrap}
-  .c-desc{min-width:180px} .c-um{font-family:var(--mono);color:var(--muted);font-size:12px;text-align:center}
-  .sys{color:var(--muted);font-family:var(--mono);text-align:right}
-  td.edit{padding:3px 6px}
-  td.edit input{width:100%;background:var(--bg2);border:1px solid transparent;border-radius:5px;padding:6px 8px;
-    color:var(--text);font-family:var(--mono);font-size:12.5px}
-  td.edit input[readonly]{background:transparent;cursor:default}
-  td.edit input:not([readonly]):focus{border-color:var(--amber);background:#0c1014}
-  input.qty{width:74px;text-align:right;font-weight:600}
-  input.changed{border-color:#4a3c12!important;background:var(--amber-dim)!important;color:#ffcf5e}
-  .dif{font-family:var(--mono);font-weight:600;text-align:right;width:54px}
-  .dif.zero{color:var(--faint)} .dif.pos{color:var(--green)} .dif.neg{color:var(--red)}
-  .estado{display:flex;align-items:center;gap:6px;white-space:nowrap}
-  .vbtn{border:1px solid var(--border2);background:var(--surface);color:var(--green);width:28px;height:26px;
-    padding:0;justify-content:center;border-radius:5px;font-size:13px}
-  .vbtn.on{background:var(--green);color:#0d1117;border-color:var(--green)}
+  /* ================= LIST VIEW (tipo Notion) ================= */
+  #listWrap{display:none;padding:0 14px 90px;max-width:920px;margin:0 auto}
+  body.view-table #listWrap{display:block}
+  .li{border:1px solid var(--border);border-radius:9px;background:var(--surface);margin-top:7px}
+  .li.corr{border-color:#4a3c12}.li.ok{border-color:#1d4427}
+  .li.open{background:var(--surface2);border-color:var(--border2)}
+  .li.dragging{opacity:.45;border-style:dashed}
+  .li-row{display:flex;align-items:center;gap:10px;padding:9px 11px;cursor:pointer;user-select:none;
+    -webkit-user-select:none;min-height:46px}
+  .li-row .drag{touch-action:none;cursor:grab;color:var(--faint);font-size:14px;letter-spacing:-2px;
+    padding:8px 5px;margin:-8px -2px}
+  .li-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .li-cod{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--blue);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .li-dim{font-family:var(--mono);font-size:11.5px;color:var(--muted);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .li-flags{display:flex;align-items:center;gap:6px}
+  .mini{font-size:10px;font-family:var(--disp);font-weight:600;letter-spacing:.5px;padding:2px 7px;
+    border-radius:10px;border:1px solid}
+  .b-new{color:var(--green);border-color:#1d4427;background:var(--green-dim)}
+  .b-tag{color:var(--blue);border-color:#1c3d5d;background:rgba(68,147,248,.1)}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:0 0 auto}
+  .d-pend{background:#39424e}.d-ok{background:var(--green)}.d-corr{background:var(--amber)}
+  .li-qty{font-family:var(--mono);font-size:15px;font-weight:600;min-width:54px;text-align:right}
+  .li-qty.changed{color:#ffcf5e}
+  .chev{color:var(--faint);font-size:11px;width:13px;text-align:center;flex:0 0 auto}
+  .li-panel{border-top:1px solid var(--border);padding:12px;background:var(--bg2);
+    border-radius:0 0 9px 9px}
+  .lp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+  .lf label{display:block;font-family:var(--disp);font-size:10px;letter-spacing:.6px;
+    text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .lf input{width:100%;font-family:var(--mono);font-size:13.5px;padding:9px 10px;border-radius:7px;
+    background:var(--surface);border:1px solid var(--border2);color:var(--text)}
+  .lf input[readonly]{background:transparent;color:var(--muted)}
+  .lf input:not([readonly]):focus{border-color:var(--amber)}
+  .lf input.changed{border-color:#4a3c12;background:var(--amber-dim);color:#ffcf5e}
+  .lf-desc{grid-column:1/-1}
+  .lf input.difv{font-weight:600}
+  .lf input.difv.pos{color:var(--green)}.lf input.difv.neg{color:var(--red)}
+  .lp-tag{margin-top:11px;display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+  .lp-tagopts{display:flex;gap:8px;flex:1;min-width:230px}
+  .lp-tagopts input{flex:1;min-width:110px;font-size:13px;padding:8px 10px}
+  .lp-actions{margin-top:11px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .lp-actions .btn-val{min-width:110px;justify-content:center}
+  .lp-actions .ordbtn{width:42px;justify-content:center;padding:8px 0}
+  .lp-actions .movegrp{display:flex;gap:6px;flex:1;min-width:210px;justify-content:flex-end}
+  .lp-actions .movegrp select{max-width:230px;flex:1;font-family:var(--mono);font-size:12px}
+  .lp-actions .btn-del{color:var(--red)}
+  @media(max-width:680px){.lp-grid{grid-template-columns:repeat(2,1fr)}}
 
   .drop{margin:50px auto;max-width:540px;text-align:center;padding:44px 28px;border:2px dashed var(--border2);
     border-radius:14px;background:var(--surface)}
@@ -258,6 +279,7 @@
       <div class="stat ok"><div class="n" id="s-ok">0</div><div class="l">Validados</div></div>
       <div class="stat corr"><div class="n" id="s-corr">0</div><div class="l">Correg.</div></div>
       <div class="stat dif"><div class="n" id="s-dif">0</div><div class="l">Con dif.</div></div>
+      <div class="stat tag"><div class="n" id="s-tag">0</div><div class="l">Etiqueta</div></div>
     </div>
     <div class="pbar"><i id="pbar"></i></div>
   </div>
@@ -270,13 +292,14 @@
       <button data-f="pendiente">Pend.</button>
       <button data-f="validado">Valid.</button>
       <button data-f="corregido">Correg.</button>
+      <button data-f="etiqueta">🏷 Etiq.</button>
     </div>
     <label class="chk"><input type="checkbox" id="onlyDif"> Solo con diferencia</label>
-    <button class="btn-ghost" id="tableLock">✏️ Editar valores</button>
+    <button class="btn-ghost" id="addBtn">➕ Ítem</button>
     <button class="btn-ghost" id="focusBtn">⛶ Enfoque</button>
     <div class="seg viewtoggle" id="viewToggle">
       <button data-v="card" class="active">🗂 Tarjeta</button>
-      <button data-v="table">📋 Tabla</button>
+      <button data-v="table">☰ Lista</button>
     </div>
   </div>
 
@@ -295,22 +318,17 @@
     <div id="cardHost"></div>
   </div>
 
-  <!-- TABLE VIEW -->
-  <div id="tableWrap">
-    <table>
-      <thead><tr>
-        <th class="num">#</th><th>Código AX</th><th>Descripción</th><th>Dimensión</th><th>NP</th>
-        <th class="num">Sistema</th><th class="num">Conteo</th><th class="num">Dif</th><th>UM</th><th>Estado</th>
-      </tr></thead>
-      <tbody id="tbody"></tbody>
-    </table>
+  <!-- LIST VIEW -->
+  <div id="listWrap">
+    <div id="listHost"></div>
     <div id="norows" class="hidden empty-card">— Sin resultados con los filtros actuales —</div>
   </div>
 
   <div class="footnote">
-    Los datos viven solo en esta pestaña: si recargas, se pierden. <b>Exporta a Excel para guardar.</b>
-    La exportación conserva todas las columnas, recalcula <code>TOTAL</code>, mantiene el catálogo
-    <code>ARTICULOS_MX</code>, respeta comillas/diagonales/guiones/acentos y añade una hoja <code>CAMBIOS</code>.
+    El progreso se guarda automáticamente en este dispositivo y sobrevive a recargas.
+    <b>Exporta a Excel para respaldar o compartir.</b>
+    La exportación conserva todas las columnas, recalcula <code>TOTAL</code>, añade los ítems nuevos
+    y movidos a su contenedor, y registra todo (incl. etiquetas) en la hoja <code>CAMBIOS</code>.
   </div>
 </div>
 
@@ -344,7 +362,19 @@ const norm = s => (s==null?"":String(s)).trim().toUpperCase().normalize("NFD")
   .replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]/g,"");
 
 let STATE={ buf:null, fname:"", sheets:[], active:0, filter:"all", q:"", onlyDif:false,
-            view:"card", cardIdx:0, cardEditing:false, tableEditable:false, focus:false };
+            view:"card", cardIdx:0, cardEditing:false, focus:false, open:new Set() };
+
+let _uidC=0;
+const uid=()=>"r"+Date.now().toString(36)+"_"+(_uidC++)+Math.random().toString(36).slice(2,6);
+const TAG_TIPOS={modificar:"Modificar etiqueta",falta:"Falta etiquetar",cantidad:"Cantidad de etiquetas"};
+/* Garantiza los campos nuevos en filas provenientes de archivos/sesiones previas. */
+function normalizeRow(r,sheetName){
+  if(r.id===undefined) r.id=uid();
+  if(r.tag===undefined) r.tag=null;
+  if(r.isNew===undefined) r.isNew=false;
+  if(r.oSheet===undefined) r.oSheet=r.isNew?"":sheetName;
+  return r;
+}
 
 /* ---------- persistencia (IndexedDB) ----------
    El conteo se guarda automáticamente para que sobreviva a recargas (iOS
@@ -383,9 +413,9 @@ function saveFile(){
 function saveProgress(){
   if(!STATE.buf) return Promise.resolve();
   clearTimeout(_saveT);
-  return idbSet(SNAP_PROG,{ v:1,
+  return idbSet(SNAP_PROG,{ v:2,
       ui:{active:STATE.active,filter:STATE.filter,q:STATE.q,onlyDif:STATE.onlyDif,view:STATE.view,cardIdx:STATE.cardIdx},
-      sheets:STATE.sheets.map(s=>s.rows.map(r=>[r.dim,r.np,r.qty,r.confirmed?1:0])) })
+      sheets:STATE.sheets.map(s=>({name:s.name,rows:s.rows.map(r=>Object.assign({},r,{tag:r.tag?Object.assign({},r.tag):null}))})) })
     .catch(e=>console.warn("No se pudo guardar el progreso",e));
 }
 let _saveT=null;
@@ -397,10 +427,21 @@ function restoreSession(){
     if(!file||!file.buf||!file.sheets||!file.sheets.length) return false;
     STATE.buf=file.buf; STATE.fname=file.fname||"";
     STATE.sheets=file.sheets.map(s=>({name:s.name,col:s.col,rows:s.rows.map(r=>Object.assign({},r))}));
+    STATE.sheets.forEach(s=>s.rows.forEach(r=>normalizeRow(r,s.name)));
     return idbGet(SNAP_PROG).catch(()=>null).then(prog=>{
-      if(prog&&prog.sheets){
-        prog.sheets.forEach((rowsP,si)=>{ const s=STATE.sheets[si]; if(!s) return;
-          rowsP.forEach((p,ri)=>{ const row=s.rows[ri]; if(!row) return;
+      if(prog&&prog.v>=2&&prog.sheets){
+        /* v2: las filas completas (orden, nuevos, movidos, etiquetas) vienen del progreso. */
+        const colByName={}; STATE.sheets.forEach(s=>colByName[s.name]=s.col);
+        STATE.sheets=prog.sheets.map(ps=>({name:ps.name,col:colByName[ps.name]||{},
+          rows:(ps.rows||[]).map(r=>normalizeRow(r,ps.name))}));
+        const u=prog.ui||{};
+        STATE.active=Math.min(Math.max(0,u.active|0),STATE.sheets.length-1);
+        STATE.filter=u.filter||"all"; STATE.q=u.q||""; STATE.onlyDif=!!u.onlyDif;
+        STATE.view=u.view||(window.innerWidth<760?"card":"table"); STATE.cardIdx=Math.max(0,u.cardIdx|0);
+      } else if(prog&&prog.sheets){
+        /* v1 (posicional): aplicar sobre las filas del archivo. */
+        prog.sheets.forEach((rowsP,si)=>{ const s=STATE.sheets[si]; if(!s||!Array.isArray(rowsP)) return;
+          rowsP.forEach((p,ri)=>{ const row=s.rows[ri]; if(!row||!Array.isArray(p)) return;
             row.dim=p[0]; row.np=p[1]; row.qty=p[2]; row.confirmed=!!p[3]; }); });
         const u=prog.ui||{};
         STATE.active=Math.min(Math.max(0,u.active|0),STATE.sheets.length-1);
@@ -440,6 +481,7 @@ function readFile(file){
     if(!sheets.length){toast("No se encontraron hojas de contenedor con CANTIDAD.","err");return;}
     STATE.buf=buf; STATE.fname=file.name; STATE.sheets=sheets; STATE.active=0;
     STATE.filter="all"; STATE.q=""; STATE.onlyDif=false; STATE.cardIdx=0; STATE.cardEditing=false;
+    STATE.open=new Set();
     STATE.view = window.innerWidth<760 ? "card":"table";
     $("#search").value=""; $("#onlyDif").checked=false;
     $("#estadoFilter").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.f==="all"));
@@ -480,7 +522,8 @@ function parseWorkbook(wb){
       const ing=(()=>{const x=get("ING");return x&&x.v!=null?Number(x.v)||0:0;})();
       rows.push({ r:rr, item:item?item.v:"", codigo:cod?(cod.v!=null?cod.v:""):"", desc:desc,
         um:(()=>{const x=get("UM");return x&&x.v!=null?String(x.v):"";})(), consumo:cons, ingreso:ing,
-        dim:dimDisp, np:npDisp, qty:qty, oDim:dimDisp, oNp:npDisp, oQty:qty, confirmed:false });
+        dim:dimDisp, np:npDisp, qty:qty, oDim:dimDisp, oNp:npDisp, oQty:qty, confirmed:false,
+        id:uid(), isNew:false, oSheet:name, tag:null });
     }
     out.push({name, col, rows});
   });
@@ -520,7 +563,8 @@ function visibleRows(){
   const s=STATE.sheets[STATE.active]; if(!s) return [];
   const q=STATE.q.trim().toLowerCase();
   return s.rows.filter(row=>{
-    if(STATE.filter!=="all"&&estado(row)!==STATE.filter) return false;
+    if(STATE.filter==="etiqueta"){ if(!row.tag) return false; }
+    else if(STATE.filter!=="all"&&estado(row)!==STATE.filter) return false;
     if(STATE.onlyDif&&Number(row.qty)===Number(row.oQty)) return false;
     if(q){ const hay=[row.codigo,row.desc,row.dim,row.np,row.item].join(" ").toLowerCase();
       if(!hay.includes(q)) return false; }
@@ -531,7 +575,7 @@ function visibleRows(){
 /* ---------- render dispatcher ---------- */
 function render(){
   updateStats();
-  if(STATE.view==="card") renderCard(); else renderTable();
+  if(STATE.view==="card") renderCard(); else renderList();
 }
 
 /* ================= CARD ================= */
@@ -577,6 +621,7 @@ function buildCard(row){
       <div class="card-actions">
         <button class="btn-edit ${ed?"editing":""}" id="editBtn">${ed?"✓ Listo":"✏️ Editar"}</button>
         <button class="btn-val ${row.confirmed&&st!=="corregido"?"on":""}" id="valBtn">✓ Validar</button>
+        <button class="btn-tagc ${row.tag?"on":""}" id="tagBtn" title="Requiere corrección de etiqueta">🏷</button>
       </div>
     </div>`;
   const dimI=card.querySelector("#f-dim"), npI=card.querySelector("#f-np"), qI=card.querySelector("#f-qty");
@@ -604,6 +649,9 @@ function buildCard(row){
   card.querySelector("#editBtn").onclick=()=>{ STATE.cardEditing=!STATE.cardEditing; renderCard();
     if(STATE.cardEditing){ const q=$("#f-qty"); if(q){q.removeAttribute("readonly");q.focus();q.select();} } };
   card.querySelector("#valBtn").onclick=()=>{ row.confirmed=!row.confirmed; refresh(); };
+  card.querySelector("#tagBtn").onclick=e=>{ row.tag=row.tag?null:{tipo:"falta",nota:""};
+    e.target.classList.toggle("on",!!row.tag); updateStats();
+    toast(row.tag?"Marcado: requiere etiqueta (detalles en vista Lista)":"Marca de etiqueta quitada","ok"); };
   return card;
 }
 
@@ -624,67 +672,224 @@ $("#cardView").addEventListener("touchend",e=>{ if(tsx===null) return;
   const dx=e.changedTouches[0].clientX-tsx; tsx=null;
   if(Math.abs(dx)>60){ if(dx<0) goCard(1,false); else goCard(-1,false); } },{passive:true});
 
-/* ================= TABLE ================= */
-function renderTable(){
-  const tb=$("#tbody"); tb.innerHTML="";
+/* ================= LIST (tipo Notion) ================= */
+function renderList(){
+  const host=$("#listHost"); host.innerHTML="";
   const rows=visibleRows();
   $("#norows").classList.toggle("hidden",rows.length>0);
-  rows.forEach(row=>tb.appendChild(buildTableRow(row)));
-  $("#tableLock").textContent=STATE.tableEditable?"🔒 Bloquear edición":"✏️ Editar valores";
-  $("#tableLock").classList.toggle("btn-primary",STATE.tableEditable);
+  rows.forEach(row=>host.appendChild(buildListItem(row)));
 }
-function buildTableRow(row){
-  const st=estado(row), dif=Number(row.qty)-Number(row.oQty), ro=!STATE.tableEditable;
-  const tr=document.createElement("tr");
-  tr.className=st==="corregido"?"corr":st==="validado"?"ok":"";
-  tr.append(td("c-item",row.item),td("c-cod",row.codigo),td("c-desc",row.desc));
-  const tdDim=document.createElement("td");tdDim.className="edit";
-  const inDim=inp(row.dim,"dim",ro);inDim.classList.toggle("changed",row.dim!==row.oDim);
-  inDim.oninput=e=>{row.dim=e.target.value;e.target.classList.toggle("changed",row.dim!==row.oDim);rowVisual(tr,row);updateStats();};
-  tdDim.appendChild(inDim);
-  const tdNp=document.createElement("td");tdNp.className="edit";
-  const inNp=inp(row.np,"np",ro);inNp.classList.toggle("changed",row.np!==row.oNp);
-  inNp.oninput=e=>{row.np=e.target.value;e.target.classList.toggle("changed",row.np!==row.oNp);rowVisual(tr,row);updateStats();};
-  tdNp.appendChild(inNp);
-  tr.append(tdDim,tdNp,td("sys",fmt(row.oQty)));
-  const tdQ=document.createElement("td");tdQ.className="edit";
-  const inQ=inp(fmt(row.qty),"qty",ro);inQ.classList.toggle("changed",Number(row.qty)!==Number(row.oQty));
-  inQ.inputMode="decimal"; inQ.onfocus=e=>{if(!ro)e.target.select();};
-  inQ.oninput=e=>{const v=e.target.value.replace(",",".").trim();
-    row.qty=v===""?0:(isNaN(Number(v))?row.qty:Number(v));
-    e.target.classList.toggle("changed",Number(row.qty)!==Number(row.oQty));tdDifCell(tr,row);rowVisual(tr,row);updateStats();};
-  inQ.onkeydown=e=>{ if(e.key==="Enter"){e.preventDefault();const all=[...$("#tbody").querySelectorAll("input.qty")];
-    const i=all.indexOf(e.target); if(i>-1&&i<all.length-1){all[i+1].focus();all[i+1].select();}else e.target.blur();} };
-  tdQ.appendChild(inQ);
-  const tdD=document.createElement("td");tdD.className="dif "+(dif===0?"zero":dif>0?"pos":"neg");
-  tdD.textContent=dif===0?"0":(dif>0?"+"+fmt(dif):fmt(dif));
-  tr.append(tdQ,tdD,td("c-um",row.um));
-  const tdE=document.createElement("td"); const w=document.createElement("div");w.className="estado";
-  const badge=document.createElement("span");badge.className="badge";
-  const vb=document.createElement("button");vb.className="vbtn";vb.textContent="✓";vb.title="Validar";
-  vb.onclick=()=>{row.confirmed=!row.confirmed;rowVisual(tr,row);updateStats();};
-  w.append(badge,vb);tdE.appendChild(w);tr.append(tdE);
-  tr._refs={badge,vb}; rowVisual(tr,row); return tr;
+function liClass(row){ const st=estado(row);
+  return "li "+(st==="corregido"?"corr ":st==="validado"?"ok ":"")+(STATE.open.has(row.id)?"open":""); }
+function buildListItem(row){
+  const el=document.createElement("div");
+  el.className=liClass(row); el.dataset.id=row.id;
+  el.appendChild(buildListRow(row,el));
+  if(STATE.open.has(row.id)) el.appendChild(buildListPanel(row,el));
+  return el;
 }
-function tdDifCell(tr,row){const dif=Number(row.qty)-Number(row.oQty);const td=tr.children[7];
-  td.className="dif "+(dif===0?"zero":dif>0?"pos":"neg");td.textContent=dif===0?"0":(dif>0?"+"+fmt(dif):fmt(dif));}
-function rowVisual(tr,row){const st=estado(row);tr.className=st==="corregido"?"corr":st==="validado"?"ok":"";
-  const {badge,vb}=tr._refs;badge.className="badge "+(st==="corregido"?"b-corr":st==="validado"?"b-ok":"b-pend");
-  badge.textContent=st==="corregido"?"Corregido":st==="validado"?"Validado":"Pendiente";
-  vb.classList.toggle("on",row.confirmed&&st!=="corregido");tdDifCell(tr,row);}
-function td(cls,txt){const t=document.createElement("td");t.className=cls;t.textContent=txt==null?"":txt;return t;}
-function inp(val,cls,ro){const i=document.createElement("input");i.type="text";i.className=cls;i.value=val==null?"":val;
-  i.spellcheck=false; if(ro)i.setAttribute("readonly","");return i;}
+function buildListRow(row,el){
+  const st=estado(row), dif=Number(row.qty)-Number(row.oQty);
+  const r=document.createElement("div"); r.className="li-row";
+  r.innerHTML=`
+    <span class="drag" title="Arrastrar para reordenar">⠿</span>
+    <span class="li-main">
+      <span class="li-cod">${esc(row.codigo||"(sin código)")}</span>
+      <span class="li-dim">${esc(row.dim||"·")}</span>
+    </span>
+    <span class="li-flags">
+      ${row.isNew?'<span class="mini b-new">Nuevo</span>':""}
+      ${row.tag?'<span class="mini b-tag">🏷</span>':""}
+      <span class="dot ${st==="corregido"?"d-corr":st==="validado"?"d-ok":"d-pend"}"></span>
+    </span>
+    <span class="li-qty ${dif===0?"":"changed"}">${fmt(row.qty)}</span>
+    <span class="chev">${STATE.open.has(row.id)?"▾":"▸"}</span>`;
+  r.onclick=e=>{ if(e.target.closest(".drag")) return; toggleItem(row,el); };
+  r.querySelector(".drag").onpointerdown=e=>startDrag(e,row,el);
+  return r;
+}
+function refreshListItem(row,el){
+  el.className=liClass(row);
+  el.querySelector(".li-row").replaceWith(buildListRow(row,el));
+  updateStats();
+}
+function toggleItem(row,el){
+  if(STATE.open.has(row.id)) STATE.open.delete(row.id); else STATE.open.add(row.id);
+  el.replaceWith(buildListItem(row));
+}
+function buildListPanel(row,el){
+  const dif=Number(row.qty)-Number(row.oQty);
+  const p=document.createElement("div"); p.className="li-panel";
+  const others=STATE.sheets.map((s,i)=>({i,name:s.name.replace(/\s+/g," ").trim()}))
+    .filter(o=>o.i!==STATE.active);
+  p.innerHTML=`
+    <div class="lp-grid">
+      <div class="lf lf-desc"><label>Descripción</label>
+        <input data-k="desc" value="${esc(row.desc)}" spellcheck="false"></div>
+      <div class="lf"><label>Código AX</label>
+        <input data-k="codigo" value="${esc(row.codigo)}" spellcheck="false" ${row.isNew?"":"readonly"}></div>
+      <div class="lf"><label>NP</label><input data-k="np" value="${esc(row.np)}" spellcheck="false"></div>
+      <div class="lf"><label>UM</label>
+        <input data-k="um" value="${esc(row.um)}" spellcheck="false" ${row.isNew?"":"readonly"}></div>
+      <div class="lf"><label>Dimensión</label><input data-k="dim" value="${esc(row.dim)}" spellcheck="false"></div>
+      <div class="lf"><label>Sistema</label><input value="${fmt(row.oQty)}" readonly></div>
+      <div class="lf"><label>Conteo · Dif <span class="difv-l"></span></label>
+        <input data-k="qty" inputmode="decimal" value="${fmt(row.qty)}"></div>
+    </div>
+    <div class="lp-tag">
+      <label class="chk"><input type="checkbox" data-k="tagOn" ${row.tag?"checked":""}> 🏷 Requiere corrección de etiqueta</label>
+      <div class="lp-tagopts ${row.tag?"":"hidden"}">
+        <select data-k="tagTipo">
+          ${Object.keys(TAG_TIPOS).map(k=>`<option value="${k}" ${row.tag&&row.tag.tipo===k?"selected":""}>${TAG_TIPOS[k]}</option>`).join("")}
+        </select>
+        <input data-k="tagNota" placeholder="Nota / cantidad…" value="${esc(row.tag?row.tag.nota:"")}" spellcheck="false">
+      </div>
+    </div>
+    <div class="lp-actions">
+      <button class="btn-val ${row.confirmed&&estado(row)!=="corregido"?"on":""}" data-a="val">✓ Validar</button>
+      <button class="ordbtn" data-a="up" title="Subir">↑</button>
+      <button class="ordbtn" data-a="down" title="Bajar">↓</button>
+      ${row.isNew?'<button class="btn-del" data-a="del">🗑 Eliminar</button>':""}
+      <div class="movegrp">
+        <select data-k="dest">
+          <option value="">⇄ Mover a…</option>
+          ${others.map(o=>`<option value="${o.i}">${esc(o.name)}</option>`).join("")}
+        </select>
+      </div>
+    </div>`;
+  const q=sel=>p.querySelector(sel);
+  const setDif=()=>{ const d=Number(row.qty)-Number(row.oQty);
+    q(".difv-l").textContent=d===0?"= 0":(d>0?"↑ +"+fmt(d):"↓ "+fmt(d));
+    q(".difv-l").style.color=d===0?"":(d>0?"var(--green)":"var(--red)");
+    q('[data-k="qty"]').classList.toggle("changed",d!==0); };
+  setDif();
+  q('[data-k="dim"]').classList.toggle("changed",row.dim!==row.oDim);
+  q('[data-k="np"]').classList.toggle("changed",row.np!==row.oNp);
+  q('[data-k="desc"]').oninput=e=>{ row.desc=e.target.value; scheduleSave(); };
+  if(row.isNew){
+    q('[data-k="codigo"]').oninput=e=>{ row.codigo=e.target.value; refreshListRowOnly(row,el); };
+    q('[data-k="um"]').oninput=e=>{ row.um=e.target.value; scheduleSave(); };
+  }
+  q('[data-k="dim"]').oninput=e=>{ row.dim=e.target.value;
+    e.target.classList.toggle("changed",row.dim!==row.oDim); refreshListRowOnly(row,el); };
+  q('[data-k="np"]').oninput=e=>{ row.np=e.target.value;
+    e.target.classList.toggle("changed",row.np!==row.oNp); refreshListRowOnly(row,el); };
+  const qtyI=q('[data-k="qty"]');
+  qtyI.onfocus=e=>e.target.select();
+  qtyI.oninput=e=>{ const v=e.target.value.replace(",",".").trim();
+    row.qty=v===""?0:(isNaN(Number(v))?row.qty:Number(v)); setDif(); refreshListRowOnly(row,el); };
+  qtyI.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); e.target.blur(); } };
+  q('[data-k="tagOn"]').onchange=e=>{
+    row.tag=e.target.checked?{tipo:q('[data-k="tagTipo"]').value||"falta",nota:q('[data-k="tagNota"]').value||""}:null;
+    p.querySelector(".lp-tagopts").classList.toggle("hidden",!row.tag);
+    refreshListRowOnly(row,el); };
+  q('[data-k="tagTipo"]').onchange=e=>{ if(row.tag){ row.tag.tipo=e.target.value; scheduleSave(); } };
+  q('[data-k="tagNota"]').oninput=e=>{ if(row.tag){ row.tag.nota=e.target.value; scheduleSave(); } };
+  q('[data-a="val"]').onclick=e=>{ row.confirmed=!row.confirmed;
+    e.target.classList.toggle("on",row.confirmed&&estado(row)!=="corregido"); refreshListRowOnly(row,el); };
+  q('[data-a="up"]').onclick=()=>moveVisible(row,-1);
+  q('[data-a="down"]').onclick=()=>moveVisible(row,1);
+  const del=q('[data-a="del"]');
+  if(del) del.onclick=()=>{ if(!confirm("¿Eliminar este ítem nuevo?")) return;
+    const s=STATE.sheets[STATE.active]; const i=s.rows.indexOf(row);
+    if(i>-1) s.rows.splice(i,1); STATE.open.delete(row.id); render(); };
+  q('[data-k="dest"]').onchange=e=>{ const di=e.target.value;
+    if(di==="") return; moveRow(row,+di); };
+  return p;
+}
+/* Actualiza solo la fila colapsada + clases del contenedor (mantiene el panel y el foco). */
+function refreshListRowOnly(row,el){
+  el.className=liClass(row);
+  el.querySelector(".li-row").replaceWith(buildListRow(row,el));
+  updateStats();
+}
+
+/* ---------- reordenar (arrastre + botones) ---------- */
+let _drag=null;
+function startDrag(e,row,el){
+  e.preventDefault();
+  _drag={row,el};
+  el.classList.add("dragging");
+  try{ e.target.setPointerCapture(e.pointerId); }catch(_){}
+  e.target.onpointermove=ev=>onDragMove(ev);
+  e.target.onpointerup=e.target.onpointercancel=ev=>endDrag(ev);
+}
+function onDragMove(e){
+  if(!_drag) return;
+  const host=$("#listHost");
+  const items=[..._host_lis(host)].filter(x=>x!==_drag.el);
+  const after=items.find(x=>{ const b=x.getBoundingClientRect(); return e.clientY < b.top+b.height/2; });
+  if(after) host.insertBefore(_drag.el,after); else host.appendChild(_drag.el);
+}
+const _host_lis=host=>host.querySelectorAll(".li");
+function endDrag(e){
+  if(!_drag) return;
+  const t=e.target; t.onpointermove=t.onpointerup=t.onpointercancel=null;
+  _drag.el.classList.remove("dragging");
+  const s=STATE.sheets[STATE.active];
+  if(s){
+    /* Permutar las filas visibles según el orden del DOM, dejando las ocultas en su sitio. */
+    const ids=[..._host_lis($("#listHost"))].map(x=>x.dataset.id);
+    const vis=new Set(ids);
+    const byId={}; s.rows.forEach(r=>byId[r.id]=r);
+    const slots=[]; s.rows.forEach((r,i)=>{ if(vis.has(r.id)) slots.push(i); });
+    ids.forEach((id,k)=>{ if(k<slots.length) s.rows[slots[k]]=byId[id]; });
+  }
+  _drag=null;
+  updateStats();
+}
+function moveVisible(row,dir){
+  const s=STATE.sheets[STATE.active]; if(!s) return;
+  const vis=visibleRows(); const vi=vis.indexOf(row);
+  const ti=vi+dir; if(vi<0||ti<0||ti>=vis.length) return;
+  const a=s.rows.indexOf(row), b=s.rows.indexOf(vis[ti]);
+  s.rows.splice(a,1); s.rows.splice(b,0,row);
+  render();
+}
+
+/* ---------- añadir ítem ---------- */
+function addItem(){
+  const s=STATE.sheets[STATE.active]; if(!s){ toast("Carga un archivo primero","err"); return; }
+  const row={ r:-1, item:"", codigo:"", desc:"", um:"", consumo:0, ingreso:0,
+    dim:"", np:"", qty:0, oDim:"", oNp:"", oQty:0, confirmed:false,
+    id:uid(), isNew:true, oSheet:"", tag:null };
+  s.rows.unshift(row);
+  STATE.open=new Set([row.id]);
+  /* limpiar filtros para que el nuevo ítem sea visible */
+  STATE.filter="all"; STATE.q=""; STATE.onlyDif=false;
+  $("#search").value=""; $("#onlyDif").checked=false;
+  $("#estadoFilter").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.f==="all"));
+  if(STATE.view!=="table"){ STATE.view="table"; exitFocus(); applyView(); }
+  render();
+  const first=$("#listHost .li"); if(first){ first.scrollIntoView({block:"start"});
+    const c=first.querySelector('[data-k="codigo"]'); if(c) c.focus(); }
+  toast("Ítem nuevo añadido al contenedor","ok");
+}
+$("#addBtn").onclick=addItem;
+
+/* ---------- mover a otro contenedor ---------- */
+function moveRow(row,di){
+  const s=STATE.sheets[STATE.active], d=STATE.sheets[di];
+  if(!d||d===s) return;
+  const i=s.rows.indexOf(row); if(i<0) return;
+  s.rows.splice(i,1);
+  d.rows.unshift(row);
+  STATE.open.delete(row.id);
+  render();
+  toast("Movido a "+d.name.replace(/\s+/g," ").trim(),"ok");
+}
+
 function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 
 /* ---------- stats ---------- */
 function updateStats(){
-  let tot=0,pend=0,ok=0,corr=0,dif=0;
+  let tot=0,pend=0,ok=0,corr=0,dif=0,tagN=0;
   STATE.sheets.forEach(s=>s.rows.forEach(row=>{tot++;const st=estado(row);
     if(st==="pendiente")pend++;else if(st==="validado")ok++;else corr++;
-    if(Number(row.qty)!==Number(row.oQty))dif++;}));
+    if(Number(row.qty)!==Number(row.oQty))dif++;
+    if(row.tag)tagN++;}));
   $("#s-total").textContent=tot;$("#s-pend").textContent=pend;$("#s-ok").textContent=ok;
-  $("#s-corr").textContent=corr;$("#s-dif").textContent=dif;
+  $("#s-corr").textContent=corr;$("#s-dif").textContent=dif;$("#s-tag").textContent=tagN;
   $("#pbar").style.width=tot?(100*(ok+corr)/tot)+"%":"0%";
   if(document.body.classList.contains("focus")) updateFocusBar();
   scheduleSave();
@@ -698,8 +903,6 @@ $("#estadoFilter").querySelectorAll("button").forEach(b=>{b.onclick=()=>{STATE.f
   $("#estadoFilter").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));render();};});
 $("#viewToggle").querySelectorAll("button").forEach(b=>{b.onclick=()=>{STATE.view=b.dataset.v;STATE.cardEditing=false;
   if(STATE.view!=="card") exitFocus(); applyView();render();};});
-$("#tableLock").onclick=()=>{STATE.tableEditable=!STATE.tableEditable;renderTable();
-  toast(STATE.tableEditable?"Edición activada":"Edición bloqueada","ok");};
 
 /* ---------- focus mode ---------- */
 function enterFocus(){
@@ -727,7 +930,7 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&STATE.focus) exitF
 $("#resetBtn").onclick=()=>{ if(!confirm("¿Descartar todos los conteos no exportados?"))return;
   exitFocus();
   clearTimeout(_saveT); clearSaved();
-  STATE={buf:null,fname:"",sheets:[],active:0,filter:"all",q:"",onlyDif:false,view:"card",cardIdx:0,cardEditing:false,tableEditable:false,focus:false};
+  STATE={buf:null,fname:"",sheets:[],active:0,filter:"all",q:"",onlyDif:false,view:"card",cardIdx:0,cardEditing:false,focus:false,open:new Set()};
   $("#app").classList.add("hidden");$("#empty").classList.remove("hidden");
   $("#exportBtn").classList.add("hidden");$("#resetBtn").classList.add("hidden");
   $("#fname").textContent="";$("#subtitle").textContent="Carga un .xlsx para comenzar";};
@@ -737,26 +940,52 @@ $("#exportBtn").onclick=exportXlsx;
 function exportXlsx(){ try{
   const wb=XLSX.read(STATE.buf,{cellFormula:true,cellStyles:true});
   const log=[["CONTENEDOR","ITEM","CODIGO AX","DESCRIPCION","CAMPO","VALOR ANTERIOR","VALOR NUEVO","ESTADO"]];
+  const colOf={}; STATE.sheets.forEach(s=>colOf[s.name]=s.col);
   STATE.sheets.forEach(s=>{
     const ws=wb.Sheets[s.name]; if(!ws) return; const col=s.col;
     const L=k=>col[k]===undefined?null:XLSX.utils.encode_col(col[k]);
     s.rows.forEach(row=>{
-      const R=row.r+1;
-      if(col.DIM!==undefined&&row.dim!==row.oDim) setText(ws,L("DIM")+R,row.dim);
-      if(col.NP!==undefined&&row.np!==row.oNp){ if(row.np==="") delete ws[L("NP")+R]; else setText(ws,L("NP")+R,row.np); }
-      if(col.QTY!==undefined) setNum(ws,L("QTY")+R,Number(row.qty)||0);
-      if(col.DESC!==undefined) setText(ws,L("DESC")+R,row.desc!=null?String(row.desc):"");
-      if(col.TOT!==undefined&&col.QTY!==undefined){
-        let f=(col.ING!==undefined?L("ING")+R+"+":"")+L("QTY")+R;
-        if(col.CONS!==undefined) f+="-"+L("CONS")+R;
-        setFormula(ws,L("TOT")+R,f,(Number(row.ingreso)||0)+(Number(row.qty)||0)-(Number(row.consumo)||0));
-      }
       const st=estado(row);
       const add=(c,a,b)=>log.push([s.name,row.item,row.codigo,row.desc,c,a,b,st]);
-      if(row.dim!==row.oDim) add("DIMENSION",row.oDim,row.dim);
-      if(row.np!==row.oNp) add("NP",row.oNp,row.np);
-      if(Number(row.qty)!==Number(row.oQty)) add("CANTIDAD",row.oQty,row.qty);
-      if(st!=="corregido"&&row.confirmed) add("(validado)","","");
+      const foreign=row.isNew||row.oSheet!==s.name;
+      if(foreign){
+        /* Ítem nuevo o movido desde otro contenedor: se añade al final de esta hoja. */
+        appendRowToSheet(ws,col,row);
+        if(row.isNew){ add("NUEVO","","conteo: "+fmt(row.qty)); }
+        else{
+          add("MOVIDO",row.oSheet.replace(/\s+/g," ").trim(),s.name.replace(/\s+/g," ").trim());
+          /* En el contenedor de origen ya no está: su conteo queda en 0. */
+          const oc=colOf[row.oSheet], ows=wb.Sheets[row.oSheet];
+          if(oc&&ows&&oc.QTY!==undefined&&row.r>=0){
+            const oR=row.r+1, oL=k=>oc[k]===undefined?null:XLSX.utils.encode_col(oc[k]);
+            setNum(ows,oL("QTY")+oR,0);
+            if(oc.TOT!==undefined){
+              let f=(oc.ING!==undefined?oL("ING")+oR+"+":"")+oL("QTY")+oR;
+              if(oc.CONS!==undefined) f+="-"+oL("CONS")+oR;
+              setFormula(ows,oL("TOT")+oR,f,(Number(row.ingreso)||0)-(Number(row.consumo)||0));
+            }
+          }
+          if(Number(row.qty)!==Number(row.oQty)) add("CANTIDAD",row.oQty,row.qty);
+        }
+        if(row.dim!==row.oDim&&!row.isNew) add("DIMENSION",row.oDim,row.dim);
+        if(row.np!==row.oNp&&!row.isNew) add("NP",row.oNp,row.np);
+      } else {
+        const R=row.r+1;
+        if(col.DIM!==undefined&&row.dim!==row.oDim) setText(ws,L("DIM")+R,row.dim);
+        if(col.NP!==undefined&&row.np!==row.oNp){ if(row.np==="") delete ws[L("NP")+R]; else setText(ws,L("NP")+R,row.np); }
+        if(col.QTY!==undefined) setNum(ws,L("QTY")+R,Number(row.qty)||0);
+        if(col.DESC!==undefined) setText(ws,L("DESC")+R,row.desc!=null?String(row.desc):"");
+        if(col.TOT!==undefined&&col.QTY!==undefined){
+          let f=(col.ING!==undefined?L("ING")+R+"+":"")+L("QTY")+R;
+          if(col.CONS!==undefined) f+="-"+L("CONS")+R;
+          setFormula(ws,L("TOT")+R,f,(Number(row.ingreso)||0)+(Number(row.qty)||0)-(Number(row.consumo)||0));
+        }
+        if(row.dim!==row.oDim) add("DIMENSION",row.oDim,row.dim);
+        if(row.np!==row.oNp) add("NP",row.oNp,row.np);
+        if(Number(row.qty)!==Number(row.oQty)) add("CANTIDAD",row.oQty,row.qty);
+        if(st!=="corregido"&&row.confirmed) add("(validado)","","");
+      }
+      if(row.tag) add("ETIQUETA","",TAG_TIPOS[row.tag.tipo]+(row.tag.nota?" · "+row.tag.nota:""));
     });
   });
   const wsLog=XLSX.utils.aoa_to_sheet(log);
@@ -771,6 +1000,26 @@ function exportXlsx(){ try{
 function setText(ws,a,v){ws[a]={t:"s",v:String(v),w:String(v)};}
 function setNum(ws,a,v){ws[a]={t:"n",v:Number(v)};}
 function setFormula(ws,a,f,c){ws[a]={t:"n",f:f,v:c};}
+/* Añade una fila (ítem nuevo/movido) al final de la hoja, extendiendo su rango. */
+function appendRowToSheet(ws,col,row){
+  if(!ws["!ref"]) return;
+  const range=XLSX.utils.decode_range(ws["!ref"]);
+  const R=range.e.r+2; /* 1-based: una debajo de la última */
+  const L=k=>col[k]===undefined?null:XLSX.utils.encode_col(col[k]);
+  if(col.ITEM!==undefined&&row.item!=="") setText(ws,L("ITEM")+R,row.item);
+  if(col.CODIGO!==undefined) setText(ws,L("CODIGO")+R,row.codigo!=null?String(row.codigo):"");
+  if(col.DESC!==undefined) setText(ws,L("DESC")+R,row.desc!=null?String(row.desc):"");
+  if(col.DIM!==undefined) setText(ws,L("DIM")+R,row.dim);
+  if(col.NP!==undefined&&row.np!=="") setText(ws,L("NP")+R,row.np);
+  if(col.UM!==undefined&&row.um!=="") setText(ws,L("UM")+R,row.um);
+  if(col.QTY!==undefined) setNum(ws,L("QTY")+R,Number(row.qty)||0);
+  if(col.TOT!==undefined&&col.QTY!==undefined){
+    let f=(col.ING!==undefined?L("ING")+R+"+":"")+L("QTY")+R;
+    if(col.CONS!==undefined) f+="-"+L("CONS")+R;
+    setFormula(ws,L("TOT")+R,f,(Number(row.ingreso)||0)+(Number(row.qty)||0)-(Number(row.consumo)||0));
+  }
+  range.e.r=R-1; ws["!ref"]=XLSX.utils.encode_range(range);
+}
 
 /* ---------- toast ---------- */
 let toastT;

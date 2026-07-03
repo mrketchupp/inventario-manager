@@ -3,7 +3,7 @@
    especialmente al añadirla a la pantalla de inicio en iOS (Safari).
    Sube CACHE_VERSION cuando cambies algún recurso para forzar la actualización. */
 
-const CACHE_VERSION = "conteo-dlta-v3";
+const CACHE_VERSION = "conteo-dlta-v4";
 
 const ASSETS = [
   "./",
