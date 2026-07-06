@@ -30,6 +30,12 @@ Además de la vista Tarjeta, la vista **Lista** muestra cada ítem compacto
 descripción, NP, UM, dimensión y conteo. Desde el panel expandido se puede:
 
 - **Reordenar** ítems (arrastrando el asa `⠿` o con los botones ↑/↓).
+- **Modo selección** (`☑ Selec.`): marca varios ítems y muévelos juntos con la
+  barra inferior — ↑/↓ (mantener presionado repite el movimiento), ⤒ al inicio,
+  ⤓ al final, o ⇄ a otro contenedor en bloque.
+- **Deshacer / rehacer** (↶ / ↷ en la barra de controles, o Ctrl+Z /
+  Ctrl+Shift+Z): cubre ediciones, validaciones, etiquetas, reordenados,
+  movimientos entre contenedores y altas/bajas de ítems.
 - **Añadir ítems nuevos** (botón `➕ Ítem`); al exportar se añaden al final de
   la hoja de su contenedor y quedan registrados como `NUEVO` en `CAMBIOS`.
 - **Mover ítems a otro contenedor**; al exportar, la fila del origen se

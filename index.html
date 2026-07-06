@@ -203,6 +203,27 @@
   .lp-actions .btn-del{color:var(--red)}
   @media(max-width:680px){.lp-grid{grid-template-columns:repeat(2,1fr)}}
 
+  /* ---------- modo selección ---------- */
+  #selModeBtn{display:none}
+  body.view-table #selModeBtn{display:inline-flex}
+  #selModeBtn.active{background:var(--amber);color:#0d1117;border-color:var(--amber);font-weight:600}
+  .selc{width:22px;height:22px;flex:0 0 auto;border:1.5px solid var(--border2);border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:12px;color:transparent}
+  .li.selected{border-color:var(--amber);background:#1a1d18}
+  .li.selected .selc{background:var(--amber);border-color:var(--amber);color:#0d1117}
+  #selBar{position:fixed;left:0;right:0;bottom:0;z-index:70;display:flex;gap:7px;align-items:center;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--surface2);
+    border-top:1px solid var(--border2);box-shadow:0 -8px 30px rgba(0,0,0,.45)}
+  #selBar .selcount{font-family:var(--mono);font-size:12.5px;color:var(--amber);font-weight:600;
+    min-width:52px}
+  #selBar button{padding:10px 0;width:44px;justify-content:center;font-size:15px;touch-action:none}
+  #selBar select{flex:1;min-width:110px;font-family:var(--mono);font-size:12px;padding:10px 8px}
+  #selBar #selExit{width:38px;font-size:13px}
+  body.view-table.selmode #listWrap{padding-bottom:150px}
+
+  /* ---------- deshacer / rehacer ---------- */
+  #undoBtn,#redoBtn{padding:8px 11px;font-size:14px}
+
   .drop{margin:50px auto;max-width:540px;text-align:center;padding:44px 28px;border:2px dashed var(--border2);
     border-radius:14px;background:var(--surface)}
   .drop.over{border-color:var(--amber);background:#1a1d18}
@@ -298,7 +319,10 @@
       <button data-f="etiqueta">🏷 Etiq.</button>
     </div>
     <label class="chk"><input type="checkbox" id="onlyDif"> Solo con diferencia</label>
+    <button class="btn-ghost" id="undoBtn" disabled title="Deshacer">↶</button>
+    <button class="btn-ghost" id="redoBtn" disabled title="Rehacer">↷</button>
     <button class="btn-ghost" id="addBtn">➕ Ítem</button>
+    <button class="btn-ghost" id="selModeBtn">☑ Selec.</button>
     <button class="btn-ghost" id="focusBtn">⛶ Enfoque</button>
     <div class="seg viewtoggle" id="viewToggle">
       <button data-v="card" class="active">🗂 Tarjeta</button>
@@ -325,6 +349,17 @@
   <div id="listWrap">
     <div id="listHost"></div>
     <div id="norows" class="hidden empty-card">— Sin resultados con los filtros actuales —</div>
+  </div>
+
+  <!-- Barra de acciones del modo selección -->
+  <div id="selBar" class="hidden">
+    <span class="selcount" id="selCount">0 sel.</span>
+    <button id="selUp" title="Subir (mantén presionado para repetir)">↑</button>
+    <button id="selDown" title="Bajar (mantén presionado para repetir)">↓</button>
+    <button id="selTop" title="Al inicio">⤒</button>
+    <button id="selBottom" title="Al final">⤓</button>
+    <select id="selDest"><option value="">⇄ Mover a…</option></select>
+    <button id="selExit" title="Salir de selección">✕</button>
   </div>
 
   <div class="footnote">
@@ -366,7 +401,51 @@ const norm = s => (s==null?"":String(s)).trim().toUpperCase().normalize("NFD")
   .replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]/g,"");
 
 let STATE={ buf:null, fname:"", sheets:[], active:0, filter:"all", q:"", onlyDif:false,
-            view:"card", cardIdx:0, cardEditing:false, focus:false, open:new Set() };
+            view:"card", cardIdx:0, cardEditing:false, focus:false, open:new Set(),
+            selMode:false, sel:new Set() };
+
+/* ---------- deshacer / rehacer ----------
+   Instantáneas de las filas de todas las hojas antes de cada operación.
+   Las ediciones de texto continuas se agrupan en una sola entrada. */
+const UNDO_MAX=30;
+let undoStack=[], redoStack=[], _lastPush={key:null,t:0};
+function snapshot(){
+  return STATE.sheets.map(s=>s.rows.map(r=>Object.assign({},r,{tag:r.tag?Object.assign({},r.tag):null})));
+}
+function pushUndo(key){
+  const now=Date.now();
+  if(key&&_lastPush.key===key&&now-_lastPush.t<900){ _lastPush.t=now; return; }
+  undoStack.push(snapshot()); if(undoStack.length>UNDO_MAX) undoStack.shift();
+  redoStack.length=0; _lastPush={key:key||null,t:now};
+  updateUndoBtns();
+}
+function pushUndoPre(pre){ /* instantánea capturada antes del cambio (inputs) */
+  undoStack.push(pre); if(undoStack.length>UNDO_MAX) undoStack.shift();
+  redoStack.length=0; _lastPush={key:null,t:0};
+  updateUndoBtns();
+}
+function applySnap(snap){
+  STATE.sheets.forEach((s,i)=>{ if(snap[i]) s.rows=snap[i]; });
+  const ids=new Set(); STATE.sheets.forEach(s=>s.rows.forEach(r=>ids.add(r.id)));
+  STATE.open=new Set([...STATE.open].filter(id=>ids.has(id)));
+  STATE.sel=new Set([...STATE.sel].filter(id=>ids.has(id)));
+  updateSelBar(); render();
+}
+function undo(){ if(!undoStack.length) return; redoStack.push(snapshot());
+  applySnap(undoStack.pop()); _lastPush={key:null,t:0}; updateUndoBtns(); toast("Deshecho","ok"); }
+function redo(){ if(!redoStack.length) return; undoStack.push(snapshot());
+  applySnap(redoStack.pop()); _lastPush={key:null,t:0}; updateUndoBtns(); toast("Rehecho","ok"); }
+function updateUndoBtns(){ $("#undoBtn").disabled=!undoStack.length; $("#redoBtn").disabled=!redoStack.length; }
+function resetUndo(){ undoStack=[]; redoStack=[]; _lastPush={key:null,t:0}; updateUndoBtns(); }
+/* Cierra la ventana de agrupamiento: la próxima operación crea su propia entrada. */
+function breakUndoCoalesce(){ _lastPush={key:null,t:0}; }
+/* En inputs: captura la instantánea al enfocar y regístrala con el primer cambio. */
+function wireUndoable(inp){
+  let pre=null;
+  inp.addEventListener("focus",()=>{ pre=snapshot(); });
+  inp.addEventListener("input",()=>{ if(pre){ pushUndoPre(pre); pre=null; } });
+  inp.addEventListener("blur",()=>{ pre=null; });
+}
 
 let _uidC=0;
 const uid=()=>"r"+Date.now().toString(36)+"_"+(_uidC++)+Math.random().toString(36).slice(2,6);
@@ -485,7 +564,8 @@ function readFile(file){
     if(!sheets.length){toast("No se encontraron hojas de contenedor con CANTIDAD.","err");return;}
     STATE.buf=buf; STATE.fname=file.name; STATE.sheets=sheets; STATE.active=0;
     STATE.filter="all"; STATE.q=""; STATE.onlyDif=false; STATE.cardIdx=0; STATE.cardEditing=false;
-    STATE.open=new Set();
+    STATE.open=new Set(); resetUndo();
+    if(STATE.selMode) setSelMode(false);
     STATE.view = window.innerWidth<760 ? "card":"table";
     $("#search").value=""; $("#onlyDif").checked=false;
     $("#estadoFilter").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.f==="all"));
@@ -644,6 +724,7 @@ function buildCard(row){
     card.querySelector("#valBtn").classList.toggle("on",row.confirmed&&s2!=="corregido");
     updateStats();
   };
+  [dimI,npI,qI].forEach(wireUndoable);
   dimI.oninput=e=>{row.dim=e.target.value;refresh();};
   npI.oninput=e=>{row.np=e.target.value;refresh();};
   qI.oninput=e=>{const v=e.target.value.replace(",",".").trim();
@@ -652,8 +733,8 @@ function buildCard(row){
   qI.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); goCard(1,true); } };
   card.querySelector("#editBtn").onclick=()=>{ STATE.cardEditing=!STATE.cardEditing; renderCard();
     if(STATE.cardEditing){ const q=$("#f-qty"); if(q){q.removeAttribute("readonly");q.focus();q.select();} } };
-  card.querySelector("#valBtn").onclick=()=>{ row.confirmed=!row.confirmed; refresh(); };
-  card.querySelector("#tagBtn").onclick=e=>{ row.tag=row.tag?null:{tipo:"falta",nota:""};
+  card.querySelector("#valBtn").onclick=()=>{ pushUndo(); row.confirmed=!row.confirmed; refresh(); };
+  card.querySelector("#tagBtn").onclick=e=>{ pushUndo(); row.tag=row.tag?null:{tipo:"falta",nota:""};
     e.target.classList.toggle("on",!!row.tag); updateStats();
     toast(row.tag?"Marcado: requiere etiqueta (detalles en vista Lista)":"Marca de etiqueta quitada","ok"); };
   return card;
@@ -684,7 +765,8 @@ function renderList(){
   rows.forEach(row=>host.appendChild(buildListItem(row)));
 }
 function liClass(row){ const st=estado(row);
-  return "li "+(st==="corregido"?"corr ":st==="validado"?"ok ":"")+(STATE.open.has(row.id)?"open":""); }
+  return "li "+(st==="corregido"?"corr ":st==="validado"?"ok ":"")
+    +(STATE.open.has(row.id)?"open ":"")+(STATE.sel.has(row.id)?"selected":""); }
 function buildListItem(row){
   const el=document.createElement("div");
   el.className=liClass(row); el.dataset.id=row.id;
@@ -693,10 +775,10 @@ function buildListItem(row){
   return el;
 }
 function buildListRow(row,el){
-  const st=estado(row), dif=Number(row.qty)-Number(row.oQty);
+  const st=estado(row), dif=Number(row.qty)-Number(row.oQty), sm=STATE.selMode;
   const r=document.createElement("div"); r.className="li-row";
   r.innerHTML=`
-    <span class="drag" title="Arrastrar para reordenar">⠿</span>
+    ${sm?'<span class="selc">✓</span>':'<span class="drag" title="Arrastrar para reordenar">⠿</span>'}
     <span class="li-main">
       <span class="li-top">
         <span class="li-cod">${esc(row.codigo||"(sin código)")}</span>
@@ -710,9 +792,13 @@ function buildListRow(row,el){
       <span class="dot ${st==="corregido"?"d-corr":st==="validado"?"d-ok":"d-pend"}"></span>
     </span>
     <span class="li-qty ${dif===0?"":"changed"}">${fmt(row.qty)}</span>
-    <span class="chev">${STATE.open.has(row.id)?"▾":"▸"}</span>`;
-  r.onclick=e=>{ if(e.target.closest(".drag")) return; toggleItem(row,el); };
-  r.querySelector(".drag").onpointerdown=e=>startDrag(e,row,el);
+    ${sm?"":'<span class="chev">'+(STATE.open.has(row.id)?"▾":"▸")+"</span>"}`;
+  if(sm){
+    r.onclick=()=>toggleSel(row,el);
+  } else {
+    r.onclick=e=>{ if(e.target.closest(".drag")) return; toggleItem(row,el); };
+    r.querySelector(".drag").onpointerdown=e=>startDrag(e,row,el);
+  }
   return r;
 }
 function refreshListItem(row,el){
@@ -786,18 +872,22 @@ function buildListPanel(row,el){
   qtyI.oninput=e=>{ const v=e.target.value.replace(",",".").trim();
     row.qty=v===""?0:(isNaN(Number(v))?row.qty:Number(v)); setDif(); refreshListRowOnly(row,el); };
   qtyI.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); e.target.blur(); } };
+  ["desc","codigo","um","dim","np","qty","tagNota"].forEach(k=>{
+    const i=q('[data-k="'+k+'"]'); if(i&&!i.readOnly) wireUndoable(i); });
   q('[data-k="tagOn"]').onchange=e=>{
+    pushUndo();
     row.tag=e.target.checked?{tipo:q('[data-k="tagTipo"]').value||"falta",nota:q('[data-k="tagNota"]').value||""}:null;
     p.querySelector(".lp-tagopts").classList.toggle("hidden",!row.tag);
     refreshListRowOnly(row,el); };
-  q('[data-k="tagTipo"]').onchange=e=>{ if(row.tag){ row.tag.tipo=e.target.value; scheduleSave(); } };
+  q('[data-k="tagTipo"]').onchange=e=>{ if(row.tag){ pushUndo("tagtipo-"+row.id); row.tag.tipo=e.target.value; scheduleSave(); } };
   q('[data-k="tagNota"]').oninput=e=>{ if(row.tag){ row.tag.nota=e.target.value; scheduleSave(); } };
-  q('[data-a="val"]').onclick=e=>{ row.confirmed=!row.confirmed;
+  q('[data-a="val"]').onclick=e=>{ pushUndo(); row.confirmed=!row.confirmed;
     e.target.classList.toggle("on",row.confirmed&&estado(row)!=="corregido"); refreshListRowOnly(row,el); };
   q('[data-a="up"]').onclick=()=>moveVisible(row,-1);
   q('[data-a="down"]').onclick=()=>moveVisible(row,1);
   const del=q('[data-a="del"]');
   if(del) del.onclick=()=>{ if(!confirm("¿Eliminar este ítem nuevo?")) return;
+    pushUndo();
     const s=STATE.sheets[STATE.active]; const i=s.rows.indexOf(row);
     if(i>-1) s.rows.splice(i,1); STATE.open.delete(row.id); render(); };
   q('[data-k="dest"]').onchange=e=>{ const di=e.target.value;
@@ -835,6 +925,7 @@ function endDrag(e){
   _drag.el.classList.remove("dragging");
   const s=STATE.sheets[STATE.active];
   if(s){
+    pushUndo("drag");
     /* Permutar las filas visibles según el orden del DOM, dejando las ocultas en su sitio. */
     const ids=[..._host_lis($("#listHost"))].map(x=>x.dataset.id);
     const vis=new Set(ids);
@@ -849,14 +940,100 @@ function moveVisible(row,dir){
   const s=STATE.sheets[STATE.active]; if(!s) return;
   const vis=visibleRows(); const vi=vis.indexOf(row);
   const ti=vi+dir; if(vi<0||ti<0||ti>=vis.length) return;
+  pushUndo("reorder-"+row.id);
   const a=s.rows.indexOf(row), b=s.rows.indexOf(vis[ti]);
   s.rows.splice(a,1); s.rows.splice(b,0,row);
   render();
 }
 
+/* ---------- modo selección (agrupar y mover varios) ---------- */
+function toggleSel(row,el){
+  if(STATE.sel.has(row.id)) STATE.sel.delete(row.id); else STATE.sel.add(row.id);
+  el.className=liClass(row);
+  updateSelBar();
+}
+function setSelMode(on){
+  STATE.selMode=on;
+  STATE.sel.clear();
+  if(on) STATE.open.clear();
+  document.body.classList.toggle("selmode",on);
+  $("#selModeBtn").classList.toggle("active",on);
+  $("#selBar").classList.toggle("hidden",!on);
+  updateSelBar(); render();
+}
+function updateSelBar(){
+  const n=STATE.sel.size;
+  $("#selCount").textContent=n+" sel.";
+  ["selUp","selDown","selTop","selBottom","selDest"].forEach(id=>{$("#"+id).disabled=!n;});
+  const sel=$("#selDest"); sel.innerHTML='<option value="">⇄ Mover a…</option>';
+  STATE.sheets.forEach((s,i)=>{ if(i===STATE.active) return;
+    const o=document.createElement("option"); o.value=i;
+    o.textContent=s.name.replace(/\s+/g," ").trim(); sel.appendChild(o); });
+  sel.value="";
+}
+/* Reordena el grupo seleccionado (se agrupa y se desplaza) dentro de las filas visibles. */
+function applyVisibleOrder(s,newVis){
+  const visIds=new Set(newVis.map(r=>r.id));
+  const slots=[]; s.rows.forEach((r,i)=>{ if(visIds.has(r.id)) slots.push(i); });
+  newVis.forEach((r,k)=>{ s.rows[slots[k]]=r; });
+}
+function moveSelected(delta,edge){
+  const s=STATE.sheets[STATE.active]; if(!s||!STATE.sel.size) return;
+  const vis=visibleRows();
+  const sel=vis.filter(r=>STATE.sel.has(r.id)); if(!sel.length) return;
+  const rest=vis.filter(r=>!STATE.sel.has(r.id));
+  const first=vis.findIndex(r=>STATE.sel.has(r.id));
+  let t;
+  if(edge==="top") t=0;
+  else if(edge==="bottom") t=rest.length;
+  else t=Math.max(0,Math.min(rest.length,first+delta));
+  /* Solo las repeticiones por mantener presionado se agrupan en un undo. */
+  pushUndo(edge?null:"selmove");
+  applyVisibleOrder(s,rest.slice(0,t).concat(sel,rest.slice(t)));
+  render();
+}
+function moveSelectedTo(di){
+  const s=STATE.sheets[STATE.active], d=STATE.sheets[di];
+  if(!d||d===s||!STATE.sel.size) return;
+  pushUndo();
+  const moving=s.rows.filter(r=>STATE.sel.has(r.id));
+  s.rows=s.rows.filter(r=>!STATE.sel.has(r.id));
+  d.rows.unshift(...moving);
+  STATE.sel.clear(); updateSelBar(); render();
+  toast("Movidos "+moving.length+" ítems a "+d.name.replace(/\s+/g," ").trim(),"ok");
+}
+/* Mantener presionado repite la acción (para avanzar varias posiciones). */
+function holdable(btn,fn){
+  let iv=null,to=null;
+  const stop=()=>{ clearTimeout(to); clearInterval(iv); iv=to=null; breakUndoCoalesce(); };
+  btn.onpointerdown=e=>{ e.preventDefault(); fn();
+    to=setTimeout(()=>{ iv=setInterval(fn,140); },420); };
+  btn.onpointerup=btn.onpointerleave=btn.onpointercancel=stop;
+}
+holdable($("#selUp"),()=>moveSelected(-1));
+holdable($("#selDown"),()=>moveSelected(1));
+$("#selTop").onclick=()=>moveSelected(0,"top");
+$("#selBottom").onclick=()=>moveSelected(0,"bottom");
+$("#selDest").onchange=e=>{ if(e.target.value!=="") moveSelectedTo(+e.target.value); };
+$("#selExit").onclick=()=>setSelMode(false);
+$("#selModeBtn").onclick=()=>setSelMode(!STATE.selMode);
+
+/* ---------- deshacer / rehacer: controles ---------- */
+$("#undoBtn").onclick=undo;
+$("#redoBtn").onclick=redo;
+document.addEventListener("keydown",e=>{
+  const tag=(e.target.tagName||"").toLowerCase();
+  if(tag==="input"||tag==="textarea"||tag==="select") return;
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){
+    e.preventDefault(); if(e.shiftKey) redo(); else undo();
+  }
+});
+
 /* ---------- añadir ítem ---------- */
 function addItem(){
   const s=STATE.sheets[STATE.active]; if(!s){ toast("Carga un archivo primero","err"); return; }
+  pushUndo();
+  if(STATE.selMode) setSelMode(false);
   const row={ r:-1, item:"", codigo:"", desc:"", um:"", consumo:0, ingreso:0,
     dim:"", np:"", qty:0, oDim:"", oNp:"", oQty:0, confirmed:false,
     id:uid(), isNew:true, oSheet:"", tag:null };
@@ -879,6 +1056,7 @@ function moveRow(row,di){
   const s=STATE.sheets[STATE.active], d=STATE.sheets[di];
   if(!d||d===s) return;
   const i=s.rows.indexOf(row); if(i<0) return;
+  pushUndo();
   s.rows.splice(i,1);
   d.rows.unshift(row);
   STATE.open.delete(row.id);
@@ -904,16 +1082,19 @@ function updateStats(){
 }
 
 /* ---------- controls ---------- */
-$("#sheetSel").onchange=e=>{STATE.active=+e.target.value;STATE.cardIdx=0;STATE.cardEditing=false;render();};
+$("#sheetSel").onchange=e=>{STATE.active=+e.target.value;STATE.cardIdx=0;STATE.cardEditing=false;
+  if(STATE.selMode){STATE.sel.clear();updateSelBar();} render();};
 $("#search").oninput=e=>{STATE.q=e.target.value;STATE.cardIdx=0;render();};
 $("#onlyDif").onchange=e=>{STATE.onlyDif=e.target.checked;STATE.cardIdx=0;render();};
 $("#estadoFilter").querySelectorAll("button").forEach(b=>{b.onclick=()=>{STATE.filter=b.dataset.f;STATE.cardIdx=0;
   $("#estadoFilter").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));render();};});
 $("#viewToggle").querySelectorAll("button").forEach(b=>{b.onclick=()=>{STATE.view=b.dataset.v;STATE.cardEditing=false;
-  if(STATE.view!=="card") exitFocus(); applyView();render();};});
+  if(STATE.view!=="card") exitFocus(); else if(STATE.selMode) setSelMode(false);
+  applyView();render();};});
 
 /* ---------- focus mode ---------- */
 function enterFocus(){
+  if(STATE.selMode) setSelMode(false);
   if(STATE.view!=="card"){STATE.view="card";applyView();}
   STATE.focus=true; document.body.classList.add("focus");
   try{ (document.documentElement.requestFullscreen||(()=>{})).call(document.documentElement); }catch(e){}
@@ -937,8 +1118,10 @@ document.addEventListener("fullscreenchange",()=>{ if(!document.fullscreenElemen
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&STATE.focus) exitFocus(); });
 $("#resetBtn").onclick=()=>{ if(!confirm("¿Descartar todos los conteos no exportados?"))return;
   exitFocus();
+  if(STATE.selMode) setSelMode(false);
+  resetUndo();
   clearTimeout(_saveT); clearSaved();
-  STATE={buf:null,fname:"",sheets:[],active:0,filter:"all",q:"",onlyDif:false,view:"card",cardIdx:0,cardEditing:false,focus:false,open:new Set()};
+  STATE={buf:null,fname:"",sheets:[],active:0,filter:"all",q:"",onlyDif:false,view:"card",cardIdx:0,cardEditing:false,focus:false,open:new Set(),selMode:false,sel:new Set()};
   $("#app").classList.add("hidden");$("#empty").classList.remove("hidden");
   $("#exportBtn").classList.add("hidden");$("#resetBtn").classList.add("hidden");
   $("#fname").textContent="";$("#subtitle").textContent="Carga un .xlsx para comenzar";};
