@@ -14,14 +14,15 @@ python3 -m http.server
 # luego abre http://localhost:8000
 ```
 
-## Guardado automático del conteo
+## Sesiones guardadas (multi-inventario)
 
-El progreso se guarda solo en el dispositivo (IndexedDB), de modo que **sobrevive
-a recargas y cierres** —incluido cuando iOS recarga la app al volver de segundo
-plano—. Se guarda al cargar el archivo, tras cada cambio (con un pequeño retardo)
-y al ocultar/cerrar la página. Al reabrir, la sesión se restaura automáticamente
-en el mismo contenedor y vista. El botón de **descartar** (reset) borra también
-lo guardado.
+Cada archivo `.xlsx` cargado crea una **sesión** independiente que se guarda
+sola en el dispositivo (IndexedDB): el avance sobrevive a recargas y cierres
+—incluido cuando iOS recarga la app al volver de segundo plano— y **cargar un
+archivo nuevo no borra la sesión anterior**. Desde el panel **🗂 Sesiones**
+(en el encabezado o en la pantalla inicial) puedes volver a cualquier "partida
+guardada", renombrarla o eliminarla. El botón **↺** descarta solo la sesión
+actual. El guardado antiguo de una sola sesión se migra automáticamente.
 
 ## Vista Lista (tipo Notion)
 

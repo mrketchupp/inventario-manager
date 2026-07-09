@@ -224,6 +224,30 @@
   /* ---------- deshacer / rehacer ---------- */
   #undoBtn,#redoBtn{padding:8px 11px;font-size:14px}
 
+  /* ---------- sesiones guardadas ---------- */
+  #sessModal{position:fixed;inset:0;z-index:90;background:rgba(3,6,10,.62);
+    display:flex;align-items:flex-end;justify-content:center}
+  .sess-panel{background:var(--surface2);border:1px solid var(--border2);width:100%;max-width:560px;
+    max-height:78vh;display:flex;flex-direction:column;border-radius:14px 14px 0 0}
+  @media(min-width:680px){#sessModal{align-items:center;padding:20px}.sess-panel{border-radius:14px}}
+  .sess-head{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;
+    border-bottom:1px solid var(--border);font-family:var(--disp);text-transform:uppercase;
+    letter-spacing:.5px;font-size:13px}
+  .sess-head button{width:34px;justify-content:center;padding:6px 0}
+  #sessList{overflow:auto;padding:6px 12px 12px;-webkit-overflow-scrolling:touch}
+  .sess-item{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--border);
+    border-radius:9px;margin-top:7px;background:var(--surface)}
+  .sess-item.cur{border-color:var(--amber)}
+  .sess-info{flex:1;min-width:0;cursor:pointer}
+  .sess-name{font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sess-item.cur .sess-name::after{content:" · actual";color:var(--amber);font-weight:400;font-size:11px}
+  .sess-meta{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:3px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sess-item button{width:38px;flex:0 0 auto;justify-content:center;padding:9px 0}
+  .sess-empty{text-align:center;color:var(--faint);font-family:var(--mono);font-size:12px;padding:26px 10px}
+  .sess-foot{padding:10px 16px calc(12px + env(safe-area-inset-bottom));font-size:11px;color:var(--faint);
+    border-top:1px solid var(--border)}
+
   .drop{margin:50px auto;max-width:540px;text-align:center;padding:44px 28px;border:2px dashed var(--border2);
     border-radius:14px;background:var(--surface)}
   .drop.over{border-color:var(--amber);background:#1a1d18}
@@ -287,8 +311,9 @@
     <h1>Conteo Físico<small id="subtitle">Carga un .xlsx para comenzar</small></h1>
     <div class="topactions">
       <span class="fname" id="fname"></span>
+      <button class="btn-ghost" id="sessBtn" title="Sesiones guardadas">🗂</button>
       <button class="btn-ghost" id="loadBtn">📂 Cargar</button>
-      <button class="btn-ghost hidden" id="resetBtn">↺</button>
+      <button class="btn-ghost hidden" id="resetBtn" title="Descartar esta sesión">↺</button>
       <button class="btn-primary hidden" id="exportBtn">⬇ Exportar</button>
     </div>
   </div>
@@ -378,7 +403,18 @@
     <p>Arrastra tu archivo <b>.xlsx</b> de inventario o toca para seleccionarlo.<br>
        Detecta cada contenedor y sus columnas automáticamente.</p>
     <button class="btn-primary" id="dropBtn">Seleccionar archivo</button>
+    <div style="margin-top:12px"><button class="btn-ghost hidden" id="dropSessBtn">🗂 Abrir una sesión guardada</button></div>
     <div class="hint">Editar Dimensión · NP · Conteo — el resto se preserva intacto</div>
+  </div>
+</div>
+
+<!-- Sesiones guardadas -->
+<div id="sessModal" class="hidden">
+  <div class="sess-panel">
+    <div class="sess-head">Sesiones guardadas <button id="sessClose">✕</button></div>
+    <div id="sessList"></div>
+    <div class="sess-foot">Cada archivo cargado crea una sesión y su avance se guarda solo en este
+      dispositivo. Puedes cambiar entre sesiones sin perder nada.</div>
   </div>
 </div>
 
@@ -459,12 +495,14 @@ function normalizeRow(r,sheetName){
   return r;
 }
 
-/* ---------- persistencia (IndexedDB) ----------
-   El conteo se guarda automáticamente para que sobreviva a recargas (iOS
-   recarga la app al pasar a segundo plano). El archivo (buf+estructura) se
-   guarda una vez al cargar; el progreso editable se guarda con debounce y al
-   ocultar la página. */
-const DB_NAME="conteoDLTA", DB_STORE="kv", SNAP_FILE="file", SNAP_PROG="progress";
+/* ---------- persistencia multi-sesión (IndexedDB) ----------
+   Cada archivo cargado crea una "sesión guardada" independiente. El avance se
+   guarda solo (con debounce y al ocultar la página, clave en iOS) y se puede
+   volver a cualquier sesión desde el panel 🗂 sin perder las demás. */
+const DB_NAME="conteoDLTA", DB_STORE="kv";
+const K_LIST="sessList", K_CUR="currentSession";
+const kFile=id=>"sess:"+id+":file", kProg=id=>"sess:"+id+":prog";
+let SESSION=null; /* id de la sesión activa */
 let _dbp=null;
 function db(){
   if(_dbp) return _dbp;
@@ -486,62 +524,188 @@ function idbDel(key){ return db().then(d=>new Promise((res,rej)=>{
   const tx=d.transaction(DB_STORE,"readwrite"); tx.objectStore(DB_STORE).delete(key);
   tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); })); }
 
+/* --- lista de sesiones (metadatos) --- */
+function getList(){ return idbGet(K_LIST).then(l=>Array.isArray(l)?l:[]).catch(()=>[]); }
+function putList(l){ return idbSet(K_LIST,l); }
+function sessStats(){
+  let tot=0,done=0;
+  STATE.sheets.forEach(s=>s.rows.forEach(r=>{ tot++; if(estado(r)!=="pendiente") done++; }));
+  return {tot,done};
+}
+function touchListMeta(){
+  if(!SESSION) return Promise.resolve();
+  return getList().then(l=>{
+    const m=l.find(x=>x.id===SESSION); if(!m) return;
+    m.updatedAt=Date.now(); m.stats=sessStats();
+    return putList(l);
+  }).catch(()=>{});
+}
+
 function saveFile(){
-  if(!STATE.buf) return Promise.resolve();
-  return idbSet(SNAP_FILE,{ v:1, fname:STATE.fname, buf:STATE.buf,
+  if(!STATE.buf||!SESSION) return Promise.resolve();
+  return idbSet(kFile(SESSION),{ v:1, fname:STATE.fname, buf:STATE.buf,
       sheets:STATE.sheets.map(s=>({name:s.name,col:s.col,rows:s.rows})) })
     .then(()=>saveProgress())
     .catch(e=>console.warn("No se pudo guardar el archivo",e));
 }
 function saveProgress(){
-  if(!STATE.buf) return Promise.resolve();
+  if(!STATE.buf||!SESSION) return Promise.resolve();
   clearTimeout(_saveT);
-  return idbSet(SNAP_PROG,{ v:2,
+  return idbSet(kProg(SESSION),{ v:2,
       ui:{active:STATE.active,filter:STATE.filter,q:STATE.q,onlyDif:STATE.onlyDif,view:STATE.view,cardIdx:STATE.cardIdx},
       sheets:STATE.sheets.map(s=>({name:s.name,rows:s.rows.map(r=>Object.assign({},r,{tag:r.tag?Object.assign({},r.tag):null}))})) })
+    .then(()=>touchListMeta())
     .catch(e=>console.warn("No se pudo guardar el progreso",e));
 }
 let _saveT=null;
 function scheduleSave(){ if(!STATE.buf) return; clearTimeout(_saveT); _saveT=setTimeout(saveProgress,500); }
-function clearSaved(){ return Promise.all([idbDel(SNAP_FILE),idbDel(SNAP_PROG)]).catch(()=>{}); }
 
-function restoreSession(){
-  return idbGet(SNAP_FILE).then(file=>{
+/* Registra una sesión nueva para el archivo recién cargado. */
+function createSession(fname){
+  SESSION=uid();
+  const now=Date.now();
+  return getList().then(l=>{
+    l.push({id:SESSION,name:fname,fname:fname,createdAt:now,updatedAt:now,stats:null});
+    return putList(l);
+  }).then(()=>idbSet(K_CUR,SESSION)).catch(e=>console.warn(e));
+}
+
+/* Carga una sesión guardada (archivo + avance) y la deja activa. */
+function loadSession(id){
+  return idbGet(kFile(id)).then(file=>{
     if(!file||!file.buf||!file.sheets||!file.sheets.length) return false;
-    STATE.buf=file.buf; STATE.fname=file.fname||"";
-    STATE.sheets=file.sheets.map(s=>({name:s.name,col:s.col,rows:s.rows.map(r=>Object.assign({},r))}));
-    STATE.sheets.forEach(s=>s.rows.forEach(r=>normalizeRow(r,s.name)));
-    return idbGet(SNAP_PROG).catch(()=>null).then(prog=>{
+    return idbGet(kProg(id)).catch(()=>null).then(prog=>{
+      clearTimeout(_saveT);
+      SESSION=id;
+      exitFocus(); if(STATE.selMode) setSelMode(false); resetUndo();
+      STATE.buf=file.buf; STATE.fname=file.fname||"";
+      STATE.open=new Set(); STATE.sel=new Set(); STATE.cardEditing=false;
+      STATE.sheets=file.sheets.map(s=>({name:s.name,col:s.col,rows:s.rows.map(r=>Object.assign({},r))}));
+      STATE.sheets.forEach(s=>s.rows.forEach(r=>normalizeRow(r,s.name)));
       if(prog&&prog.v>=2&&prog.sheets){
         /* v2: las filas completas (orden, nuevos, movidos, etiquetas) vienen del progreso. */
         const colByName={}; STATE.sheets.forEach(s=>colByName[s.name]=s.col);
         STATE.sheets=prog.sheets.map(ps=>({name:ps.name,col:colByName[ps.name]||{},
           rows:(ps.rows||[]).map(r=>normalizeRow(r,ps.name))}));
-        const u=prog.ui||{};
-        STATE.active=Math.min(Math.max(0,u.active|0),STATE.sheets.length-1);
-        STATE.filter=u.filter||"all"; STATE.q=u.q||""; STATE.onlyDif=!!u.onlyDif;
-        STATE.view=u.view||(window.innerWidth<760?"card":"table"); STATE.cardIdx=Math.max(0,u.cardIdx|0);
       } else if(prog&&prog.sheets){
         /* v1 (posicional): aplicar sobre las filas del archivo. */
         prog.sheets.forEach((rowsP,si)=>{ const s=STATE.sheets[si]; if(!s||!Array.isArray(rowsP)) return;
           rowsP.forEach((p,ri)=>{ const row=s.rows[ri]; if(!row||!Array.isArray(p)) return;
             row.dim=p[0]; row.np=p[1]; row.qty=p[2]; row.confirmed=!!p[3]; }); });
-        const u=prog.ui||{};
-        STATE.active=Math.min(Math.max(0,u.active|0),STATE.sheets.length-1);
-        STATE.filter=u.filter||"all"; STATE.q=u.q||""; STATE.onlyDif=!!u.onlyDif;
-        STATE.view=u.view||(window.innerWidth<760?"card":"table"); STATE.cardIdx=Math.max(0,u.cardIdx|0);
-      } else {
-        STATE.view=window.innerWidth<760?"card":"table";
       }
+      const u=(prog&&prog.ui)||{};
+      STATE.active=Math.min(Math.max(0,u.active|0),STATE.sheets.length-1);
+      STATE.filter=u.filter||"all"; STATE.q=u.q||""; STATE.onlyDif=!!u.onlyDif;
+      STATE.view=u.view||(window.innerWidth<760?"card":"table"); STATE.cardIdx=Math.max(0,u.cardIdx|0);
       $("#search").value=STATE.q; $("#onlyDif").checked=STATE.onlyDif;
       $("#estadoFilter").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.f===STATE.filter));
       bootUI();
+      idbSet(K_CUR,id).catch(()=>{});
       let n=0; STATE.sheets.forEach(s=>s.rows.forEach(r=>{ if(changed(r)||r.confirmed) n++; }));
       toast("Sesión restaurada"+(n?" · "+n+" ítems con avance":""),"ok");
       return true;
     });
   }).catch(e=>{ console.warn("No se pudo restaurar la sesión",e); return false; });
 }
+
+/* Cambiar de sesión: guarda la actual y abre la otra. */
+function switchSession(id){
+  if(id===SESSION){ closeSessModal(); return; }
+  const go=()=>loadSession(id).then(ok=>{
+    closeSessModal();
+    if(!ok) toast("No se pudo abrir esa sesión","err");
+  });
+  if(STATE.buf&&SESSION) saveProgress().then(go,go); else go();
+}
+
+/* Eliminar una sesión guardada. */
+function deleteSession(id){
+  return getList().then(l=>putList(l.filter(x=>x.id!==id)))
+    .then(()=>Promise.all([idbDel(kFile(id)),idbDel(kProg(id))]))
+    .then(()=>{ if(id===SESSION){ SESSION=null; idbDel(K_CUR).catch(()=>{}); showEmpty(); } })
+    .catch(e=>console.warn(e));
+}
+
+/* Migración: el guardado antiguo de una sola sesión pasa a la lista. */
+function migrateLegacy(){
+  return idbGet("file").then(file=>{
+    if(!file||!file.buf) return;
+    return idbGet("progress").catch(()=>null).then(prog=>{
+      const id=uid(), now=Date.now();
+      const ops=[idbSet(kFile(id),file)];
+      if(prog) ops.push(idbSet(kProg(id),prog));
+      return Promise.all(ops)
+        .then(()=>getList())
+        .then(l=>{ l.push({id,name:file.fname||"Sesión",fname:file.fname||"",createdAt:now,updatedAt:now,stats:null});
+          return putList(l); })
+        .then(()=>idbGet(K_CUR).then(c=>c?null:idbSet(K_CUR,id)))
+        .then(()=>Promise.all([idbDel("file"),idbDel("progress")]));
+    });
+  }).catch(()=>{});
+}
+
+/* Arranque: migrar si hace falta y reabrir la sesión activa. */
+function restoreSession(){
+  return migrateLegacy()
+    .then(()=>idbGet(K_CUR))
+    .then(cur=>cur?loadSession(cur):false)
+    .then(ok=>{ refreshDropSess(); return ok; })
+    .catch(()=>{ refreshDropSess(); return false; });
+}
+
+/* Pantalla vacía (sin sesión activa). */
+function showEmpty(){
+  STATE={buf:null,fname:"",sheets:[],active:0,filter:"all",q:"",onlyDif:false,view:"card",
+    cardIdx:0,cardEditing:false,focus:false,open:new Set(),selMode:false,sel:new Set()};
+  $("#app").classList.add("hidden"); $("#empty").classList.remove("hidden");
+  $("#exportBtn").classList.add("hidden"); $("#resetBtn").classList.add("hidden");
+  $("#fname").textContent=""; $("#subtitle").textContent="Carga un .xlsx para comenzar";
+  refreshDropSess();
+}
+function refreshDropSess(){
+  getList().then(l=>{ $("#dropSessBtn").classList.toggle("hidden",!l.length); });
+}
+
+/* --- panel de sesiones --- */
+function fmtDate(t){ const d=new Date(t),p=n=>String(n).padStart(2,"0");
+  return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear()+" "+p(d.getHours())+":"+p(d.getMinutes()); }
+function openSessModal(){
+  getList().then(l=>{
+    const host=$("#sessList"); host.innerHTML="";
+    if(!l.length){ host.innerHTML='<div class="sess-empty">— No hay sesiones guardadas —<br>Carga un .xlsx para crear la primera.</div>'; }
+    l.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).forEach(m=>{
+      const it=document.createElement("div");
+      it.className="sess-item"+(m.id===SESSION?" cur":"");
+      const st=m.stats?(" · "+m.stats.done+"/"+m.stats.tot+" avanzados"):"";
+      it.innerHTML=`
+        <div class="sess-info">
+          <div class="sess-name">${esc(m.name||m.fname||"Sesión")}</div>
+          <div class="sess-meta">${fmtDate(m.updatedAt||m.createdAt)}${st}</div>
+        </div>
+        <button data-a="ren" title="Renombrar">✏️</button>
+        <button data-a="del" title="Eliminar" style="color:var(--red)">🗑</button>`;
+      it.querySelector(".sess-info").onclick=()=>switchSession(m.id);
+      it.querySelector('[data-a="ren"]').onclick=()=>{
+        const n=prompt("Nombre de la sesión:",m.name||m.fname||"");
+        if(n===null||!n.trim()) return;
+        getList().then(l2=>{ const x=l2.find(y=>y.id===m.id); if(x){x.name=n.trim();}
+          return putList(l2); }).then(openSessModal);
+      };
+      it.querySelector('[data-a="del"]').onclick=()=>{
+        const cur=m.id===SESSION?" Es la sesión ACTUAL.":"";
+        if(!confirm("¿Eliminar la sesión \""+(m.name||m.fname)+"\" y su avance?"+cur)) return;
+        deleteSession(m.id).then(openSessModal);
+      };
+      host.appendChild(it);
+    });
+    $("#sessModal").classList.remove("hidden");
+  });
+}
+function closeSessModal(){ $("#sessModal").classList.add("hidden"); }
+$("#sessBtn").onclick=openSessModal;
+$("#dropSessBtn").onclick=openSessModal;
+$("#sessClose").onclick=closeSessModal;
+$("#sessModal").onclick=e=>{ if(e.target.id==="sessModal") closeSessModal(); };
 
 /* Guardado inmediato al ocultar/cerrar la página (clave en iOS). */
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden") saveProgress(); });
@@ -562,6 +726,9 @@ function readFile(file){
     const wb=XLSX.read(buf,{cellFormula:true,cellStyles:false});
     const sheets=parseWorkbook(wb);
     if(!sheets.length){toast("No se encontraron hojas de contenedor con CANTIDAD.","err");return;}
+    /* la sesión anterior queda guardada; el nuevo archivo abre una sesión aparte */
+    if(STATE.buf&&SESSION) saveProgress();
+    createSession(file.name);
     STATE.buf=buf; STATE.fname=file.name; STATE.sheets=sheets; STATE.active=0;
     STATE.filter="all"; STATE.q=""; STATE.onlyDif=false; STATE.cardIdx=0; STATE.cardEditing=false;
     STATE.open=new Set(); resetUndo();
@@ -1116,15 +1283,12 @@ $("#focusBtn").onclick=enterFocus;
 $("#focusExit").onclick=exitFocus;
 document.addEventListener("fullscreenchange",()=>{ if(!document.fullscreenElement&&STATE.focus){} });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&STATE.focus) exitFocus(); });
-$("#resetBtn").onclick=()=>{ if(!confirm("¿Descartar todos los conteos no exportados?"))return;
+$("#resetBtn").onclick=()=>{ if(!confirm("¿Eliminar esta sesión y sus conteos no exportados?\n(Las demás sesiones guardadas no se tocan.)"))return;
   exitFocus();
   if(STATE.selMode) setSelMode(false);
   resetUndo();
-  clearTimeout(_saveT); clearSaved();
-  STATE={buf:null,fname:"",sheets:[],active:0,filter:"all",q:"",onlyDif:false,view:"card",cardIdx:0,cardEditing:false,focus:false,open:new Set(),selMode:false,sel:new Set()};
-  $("#app").classList.add("hidden");$("#empty").classList.remove("hidden");
-  $("#exportBtn").classList.add("hidden");$("#resetBtn").classList.add("hidden");
-  $("#fname").textContent="";$("#subtitle").textContent="Carga un .xlsx para comenzar";};
+  clearTimeout(_saveT);
+  deleteSession(SESSION); };
 
 /* ---------- export ---------- */
 $("#exportBtn").onclick=exportXlsx;
